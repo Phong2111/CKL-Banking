@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "103652667845",
+    "project_id": "ckl-banking",
+    "storage_bucket": "ckl-banking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:103652667845:android:370b7996fe3d8ab9c61bac",
+        "android_client_info": {
+          "package_name": "com.example.cklbanking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9AErR5ZORs0E8smHOlTy1bXO3cb4L6Lo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
