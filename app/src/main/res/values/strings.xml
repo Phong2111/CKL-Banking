@@ -1,3 +1,90 @@
 <resources>
-    <string name="app_name">CKL Banking</string>
+    <string name="app_name">CKL-Banking</string>
+    
+    <!-- Common -->
+    <string name="save">Lưu</string>
+    <string name="cancel">Hủy</string>
+    <string name="confirm">Xác nhận</string>
+    <string name="edit">Chỉnh sửa</string>
+    <string name="delete">Xóa</string>
+    <string name="logout">Đăng xuất</string>
+    
+    <!-- Customer Profile -->
+    <string name="profile">Hồ sơ cá nhân</string>
+    <string name="full_name">Họ và tên</string>
+    <string name="email">Email</string>
+    <string name="phone">Số điện thoại</string>
+    <string name="address">Địa chỉ</string>
+    <string name="date_of_birth">Ngày sinh</string>
+    <string name="id_number">CMND/CCCD</string>
+    <string name="edit_profile">Chỉnh sửa hồ sơ</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard">Tổng quan</string>
+    <string name="total_balance">Tổng số dư</string>
+    <string name="my_accounts">Tài khoản của tôi</string>
+    <string name="recent_transactions">Giao dịch gần đây</string>
+    <string name="view_all">Xem tất cả</string>
+    
+    <!-- Account Types -->
+    <string name="checking_account">Tài khoản thanh toán</string>
+    <string name="saving_account">Tài khoản tiết kiệm</string>
+    <string name="mortgage_account">Tài khoản vay thế chấp</string>
+    <string name="account_balance">Số dư</string>
+    <string name="interest_rate">Lãi suất</string>
+    <string name="amount_due">Tiền phải trả</string>
+    <string name="account_number">Số tài khoản</string>
+    
+    <!-- Transaction -->
+    <string name="transaction_history">Lịch sử giao dịch</string>
+    <string name="transaction_date">Ngày giao dịch</string>
+    <string name="transaction_amount">Số tiền</string>
+    <string name="transaction_type">Loại giao dịch</string>
+    <string name="transaction_status">Trạng thái</string>
+    <string name="deposit">Nạp tiền</string>
+    <string name="withdraw">Rút tiền</string>
+    <string name="transfer">Chuyển khoản</string>
+    
+    <!-- eKYC -->
+    <string name="ekyc_title">Xác thực danh tính</string>
+    <string name="ekyc_description">Vui lòng quét khuôn mặt để xác thực</string>
+    <string name="scan_face">Quét khuôn mặt</string>
+    <string name="retake">Chụp lại</string>
+    <string name="verify">Xác thực</string>
+    
+    <!-- Login & Auth -->
+    <string name="login">\u0110\u0103ng nh\u1eadp</string>
+    <string name="register">\u0110\u0103ng k\u00fd</string>
+    <string name="username">T\u00ean \u0111\u0103ng nh\u1eadp</string>
+    <string name="password">M\u1eadt kh\u1ea9u</string>
+    <string name="forgot_password">Qu\u00ean m\u1eadt kh\u1ea9u?</string>
+    <string name="otp_verification">X\u00e1c th\u1ef1c OTP</string>
+    <string name="enter_otp">Nh\u1eadp m\u00e3 OTP</string>
+    <string name="resend_otp">G\u1eedi l\u1ea1i</string>
+    
+    <!-- Transfer -->
+    <string name="transfer_money">Chuy\u1ec3n ti\u1ec1n</string>
+    <string name="recipient">Ng\u01b0\u1eddi nh\u1eadn</string>
+    <string name="amount">S\u1ed1 ti\u1ec1n</string>
+    <string name="message">N\u1ed9i dung</string>
+    <string name="internal_transfer">Chuy\u1ec3n n\u1ed9i b\u1ed9</string>
+    <string name="external_transfer">Li\u00ean ng\u00e2n h\u00e0ng</string>
+    
+    <!-- Utilities -->
+    <string name="utilities">Ti\u1ec7n \u00edch</string>
+    <string name="bill_payment">Thanh to\u00e1n h\u00f3a \u0111\u01a1n</string>
+    <string name="phone_recharge">N\u1ea1p ti\u1ec1n \u0111i\u1ec7n tho\u1ea1i</string>
+    <string name="flight_ticket">V\u00e9 m\u00e1y bay</string>
+    <string name="movie_ticket">V\u00e9 xem phim</string>
+    <string name="hotel_booking">\u0110\u1eb7t kh\u00e1ch s\u1ea1n</string>
+    
+    <!-- Officer -->
+    <string name="create_customer">T\u1ea1o t\u00e0i kho\u1ea3n kh\u00e1ch h\u00e0ng</string>
+    <string name="customer_list">Danh s\u00e1ch kh\u00e1ch h\u00e0ng</string>
+    <string name="modify_interest_rate">S\u1eeda l\u00e3i su\u1ea5t</string>
+    
+    <!-- Map -->
+    <string name="find_branch">T\u00ecm chi nh\u00e1nh</string>
+    <string name="nearest_branch">Chi nh\u00e1nh g\u1ea7n nh\u1ea5t</string>
+    <string name="get_directions">Ch\u1ec9 \u0111\u01b0\u1eddng</string>
 </resources>
