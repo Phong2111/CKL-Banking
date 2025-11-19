@@ -38,7 +38,12 @@ public class Account {
     public double getBalance() { return balance; }
     public void setBalance(double balance) { this.balance = balance; }
 
-    // ...Tương tự cho các trường còn lại...
+    public double getInterestRate() { return interestRate; }
+    public void setInterestRate(double interestRate) { this.interestRate = interestRate; }
 
+    public double getMonthlyPayment() { return monthlyPayment; }
+    public void setMonthlyPayment(double monthlyPayment) { this.monthlyPayment = monthlyPayment; }
 
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }
