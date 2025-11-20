@@ -50,4 +50,7 @@ public class User {
 
     public String getEkycStatus() { return ekycStatus;}
     public void setEkycStatus(String ekycStatus) { this.ekycStatus = ekycStatus; }
+
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }
