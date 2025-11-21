@@ -18,7 +18,7 @@
             android:background="@color/primary"
             app:title="@string/transaction_history"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
@@ -134,7 +134,7 @@
             <ImageView
                 android:layout_width="120dp"
                 android:layout_height="120dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:src="@drawable/ic_history"
                 app:tint="@color/text_hint"
                 android:alpha="0.5"/>
 

@@ -104,11 +104,27 @@ public class CustomerDashboardActivity extends AppCompatActivity {
 
     private void setupToolbar() {
         setSupportActionBar(toolbar);
+        toolbar.inflateMenu(R.menu.menu_dashboard);
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_notifications) {
+                startActivity(new Intent(this, NotificationsActivity.class));
+                return true;
+            } else if (item.getItemId() == R.id.action_settings) {
+                startActivity(new Intent(this, SettingsActivity.class));
+                return true;
+            }
+            return false;
+        });
     }
 
     private void setupRecyclerView() {
         recentTransactions = new ArrayList<>();
         adapter = new TransactionAdapter(this, recentTransactions);
+        adapter.setOnTransactionClickListener(transaction -> {
+            Intent intent = new Intent(CustomerDashboardActivity.this, TransactionDetailActivity.class);
+            intent.putExtra("transaction_id", transaction.getTransactionId());
+            startActivity(intent);
+        });
         recentTransactionsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         recentTransactionsRecyclerView.setAdapter(adapter);
     }
@@ -119,8 +135,8 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         mortgageAccountCard.setOnClickListener(v -> openAccountDetail("mortgage"));
         
         btnTransfer.setOnClickListener(v -> openTransferMoney());
-        btnDeposit.setOnClickListener(v -> Toast.makeText(this, "Chức năng đang phát triển", Toast.LENGTH_SHORT).show());
-        btnWithdraw.setOnClickListener(v -> Toast.makeText(this, "Chức năng đang phát triển", Toast.LENGTH_SHORT).show());
+        btnDeposit.setOnClickListener(v -> startActivity(new Intent(this, DepositActivity.class)));
+        btnWithdraw.setOnClickListener(v -> startActivity(new Intent(this, WithdrawActivity.class)));
         btnMore.setOnClickListener(v -> openUtilities());
         
         btnViewAllTransactions.setOnClickListener(v -> openTransactionHistory());

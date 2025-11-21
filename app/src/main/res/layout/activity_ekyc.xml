@@ -18,7 +18,7 @@
             android:background="@color/primary"
             app:title="@string/ekyc_title"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
@@ -94,7 +94,7 @@
                     android:layout_width="280dp"
                     android:layout_height="350dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_launcher_foreground"
+                    android:src="@drawable/ic_person"
                     android:alpha="0.5"/>
 
                 <!-- Status Text -->
@@ -145,7 +145,7 @@
                     android:id="@+id/resultIcon"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:src="@drawable/ic_launcher_foreground"/>
+                    android:src="@drawable/ic_verified"/>
 
                 <LinearLayout
                     android:layout_width="0dp"

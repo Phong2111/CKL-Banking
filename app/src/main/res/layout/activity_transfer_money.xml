@@ -18,7 +18,7 @@
             android:background="@color/primary"
             app:title="Chuyển tiền"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -145,7 +145,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:layout_gravity="center_vertical"
-                            android:src="@drawable/ic_launcher_foreground"
+                            android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/text_hint"/>
                     </LinearLayout>
                 </LinearLayout>
@@ -193,7 +193,7 @@
                         style="@style/InputField"
                         android:hint="Số tài khoản người nhận"
                         app:endIconMode="custom"
-                        app:endIconDrawable="@drawable/ic_launcher_foreground">
+                        app:endIconDrawable="@drawable/ic_qr_code">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/editRecipientAccount"
@@ -215,7 +215,7 @@
                         <ImageView
                             android:layout_width="24dp"
                             android:layout_height="24dp"
-                            android:src="@drawable/ic_launcher_foreground"
+                            android:src="@drawable/ic_verified"
                             app:tint="@color/success"/>
 
                         <LinearLayout

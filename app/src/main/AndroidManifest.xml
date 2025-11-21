@@ -27,16 +27,34 @@
             android:name=".activities.MainActivity"
             android:exported="false" />
 
-        <!-- Login Activity - LAUNCHER -->
+        <!-- Splash Activity - LAUNCHER -->
         <activity
-            android:name=".activities.LoginActivity"
+            android:name=".activities.SplashActivity"
             android:exported="true"
-            android:theme="@style/Theme.CKLBanking">
+            android:theme="@style/Theme.CKLBanking.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Login Activity -->
+        <activity
+            android:name=".activities.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.CKLBanking" />
+
+        <!-- Register Activity -->
+        <activity
+            android:name=".activities.RegisterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.CKLBanking" />
+
+        <!-- Forgot Password Activity -->
+        <activity
+            android:name=".activities.ForgotPasswordActivity"
+            android:exported="false"
+            android:theme="@style/Theme.CKLBanking" />
 
         <!-- Customer Flow Activities -->
         <activity
@@ -60,7 +78,19 @@
             android:exported="false" />
 
         <activity
+            android:name=".activities.TransactionDetailActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".activities.TransferMoneyActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.DepositActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.WithdrawActivity"
             android:exported="false" />
 
         <activity
@@ -77,6 +107,14 @@
 
         <activity
             android:name=".activities.BranchLocatorActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.SettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.NotificationsActivity"
             android:exported="false" />
 
     </application>

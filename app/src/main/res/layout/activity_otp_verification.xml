@@ -18,7 +18,7 @@
             android:background="@color/primary"
             app:title="Xác thực OTP"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
@@ -48,7 +48,7 @@
                 <ImageView
                     android:layout_width="64dp"
                     android:layout_height="64dp"
-                    android:src="@drawable/ic_launcher_foreground"
+                    android:src="@drawable/ic_verified"
                     app:tint="@color/white"/>
 
                 <TextView

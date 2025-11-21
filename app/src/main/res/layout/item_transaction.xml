@@ -27,7 +27,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:layout_gravity="center"
-                android:src="@drawable/ic_launcher_foreground"
+                android:src="@drawable/ic_transfer"
                 app:tint="@color/primary"/>
         </com.google.android.material.card.MaterialCardView>
 
