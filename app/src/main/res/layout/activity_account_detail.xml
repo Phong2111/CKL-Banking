@@ -18,7 +18,7 @@
             android:background="@color/primary"
             app:title="Chi tiết tài khoản"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -81,7 +81,7 @@
                             android:id="@+id/accountTypeIcon"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
-                            android:src="@drawable/ic_launcher_foreground"
+                            android:src="@drawable/ic_wallet"
                             app:tint="@color/white"/>
                     </LinearLayout>
 

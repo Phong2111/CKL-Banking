@@ -17,7 +17,7 @@
             android:background="@color/primary"
             app:title="Tìm chi nhánh"
             app:titleTextColor="@color/white"
-            app:navigationIcon="@drawable/ic_launcher_foreground"/>
+            app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- Map Container (Placeholder - Add Google Maps later) -->
@@ -104,7 +104,7 @@
                             android:layout_width="28dp"
                             android:layout_height="28dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_launcher_foreground"
+                            android:src="@drawable/ic_bank"
                             app:tint="@color/primary"/>
                     </com.google.android.material.card.MaterialCardView>
 
@@ -139,7 +139,7 @@
                             <ImageView
                                 android:layout_width="16dp"
                                 android:layout_height="16dp"
-                                android:src="@drawable/ic_launcher_foreground"
+                                android:src="@drawable/ic_location"
                                 app:tint="@color/success"/>
 
                             <TextView
@@ -223,7 +223,7 @@
         android:layout_gravity="end|top"
         app:layout_anchor="@id/mapContainer"
         app:layout_anchorGravity="end|top"
-        android:src="@drawable/ic_launcher_foreground"
+        android:src="@drawable/ic_filter"
         app:tint="@color/white"
         app:backgroundTint="@color/primary"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

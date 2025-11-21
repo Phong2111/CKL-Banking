@@ -23,7 +23,7 @@ public class LoginActivity extends AppCompatActivity {
     // UI Components
     private EditText editEmail, editPassword;
     private MaterialButton btnLogin;
-    private TextView btnRegister;
+    private TextView btnRegister, btnForgotPassword;
     private CircularProgressIndicator progressBar;
 
     // Firebase
@@ -56,13 +56,17 @@ public class LoginActivity extends AppCompatActivity {
         editPassword = findViewById(R.id.editPassword);
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
+        btnForgotPassword = findViewById(R.id.btnForgotPassword);
         progressBar = findViewById(R.id.progressBar);
     }
 
     private void setupListeners() {
         btnLogin.setOnClickListener(v -> loginUser());
         btnRegister.setOnClickListener(v -> {
-            Toast.makeText(this, "Đăng ký đang được phát triển", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, RegisterActivity.class));
+        });
+        btnForgotPassword.setOnClickListener(v -> {
+            startActivity(new Intent(this, ForgotPasswordActivity.class));
         });
     }
 
@@ -143,6 +147,7 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!show);
         btnRegister.setEnabled(!show);
+        btnForgotPassword.setEnabled(!show);
         editEmail.setEnabled(!show);
         editPassword.setEnabled(!show);
     }
