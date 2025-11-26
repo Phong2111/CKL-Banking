@@ -56,12 +56,21 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_customer_dashboard);
 
-        // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+
+
+        if (mAuth.getCurrentUser() == null) {
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
+            return;
+        }
         userId = mAuth.getCurrentUser().getUid();
 
-        // Initialize Views
+        // SỬA: Khởi tạo List ngay lập tức
+        userAccounts = new ArrayList<>();
+        recentTransactions = new ArrayList<>();
+
         initViews();
 
         // Setup Toolbar
@@ -205,24 +214,30 @@ public class CustomerDashboardActivity extends AppCompatActivity {
     }
 
     private void loadRecentTransactions() {
-        // Get all transactions
+        // Cần đảm bảo trong Collection 'transactions' bạn có lưu field 'relatedUserId' hoặc 'ownerId'
+        // Nếu chưa có, hãy query theo accountId (phức tạp hơn chút)
+
+        // Tạm thời ví dụ lọc theo người gửi (fromAccountId)
+        // Lưu ý: Cách tốt nhất là Transaction model có field 'userId'
+
+        /* GIẢ SỬ BẠN ĐÃ THÊM FIELD 'userId' VÀO TRANSACTION */
         db.collection("transactions")
+                .whereEqualTo("userId", userId) // QUAN TRỌNG: Chỉ lấy của user này
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(5)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
-                    recentTransactions.clear();
-                    
+                    recentTransactions.clear(); // Xóa dữ liệu cũ trước khi add mới
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Transaction transaction = document.toObject(Transaction.class);
+                        // Gán ID document vào object để sau này dùng click xem chi tiết
+                        transaction.setTransactionId(document.getId());
                         recentTransactions.add(transaction);
                     }
-                    
                     adapter.notifyDataSetChanged();
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Lỗi tải giao dịch: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
