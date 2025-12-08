@@ -114,6 +114,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".activities.ChangePasswordActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".activities.NotificationsActivity"
             android:exported="false" />
 

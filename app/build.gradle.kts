@@ -32,6 +32,11 @@ android {
     }
 }
 
+// Configure Java compiler to show deprecation warnings
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Xlint:deprecation")
+}
+
 
 
 dependencies {

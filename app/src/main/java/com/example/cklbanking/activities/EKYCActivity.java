@@ -3,6 +3,8 @@ package com.example.cklbanking.activities;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -89,7 +91,7 @@ public class EKYCActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
+        toolbar.setNavigationOnClickListener(v -> finish());
     }
 
     private void setupListeners() {
@@ -97,6 +99,7 @@ public class EKYCActivity extends AppCompatActivity {
         btnRetake.setOnClickListener(v -> retryCapture());
     }
 
+    @SuppressWarnings("deprecation")
     private void checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -109,6 +112,7 @@ public class EKYCActivity extends AppCompatActivity {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -184,14 +188,14 @@ public class EKYCActivity extends AppCompatActivity {
 
         faceDetector.process(image)
             .addOnSuccessListener(faces -> {
-                if (!faces.isEmpty()) {
+                    if (!faces.isEmpty()) {
                     faceDetected = true;
                     statusText.setText("Khuôn mặt đã được phát hiện!");
-                    statusText.setTextColor(getColor(R.color.success));
+                    statusText.setTextColor(ContextCompat.getColor(this, R.color.success));
                 } else {
                     faceDetected = false;
                     statusText.setText("Không phát hiện khuôn mặt");
-                    statusText.setTextColor(getColor(R.color.error));
+                    statusText.setTextColor(ContextCompat.getColor(this, R.color.error));
                 }
             })
             .addOnFailureListener(e -> {
@@ -208,12 +212,12 @@ public class EKYCActivity extends AppCompatActivity {
         showLoading(true);
 
         // Simulate capture
-        new android.os.Handler().postDelayed(() -> {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
             showLoading(false);
             faceDetected = true;
             
             statusText.setText("Ảnh đã được chụp thành công!");
-            statusText.setTextColor(getColor(R.color.success));
+            statusText.setTextColor(ContextCompat.getColor(this, R.color.success));
             statusText.setVisibility(View.VISIBLE);
             
             btnCapture.setVisibility(View.GONE);

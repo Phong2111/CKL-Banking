@@ -35,7 +35,7 @@ public class TransactionDetailActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_transaction_detail);
 
-        currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+        currencyFormat = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("vi-VN"));
         dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
