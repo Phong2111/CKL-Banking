@@ -8,6 +8,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.cklbanking.R;
@@ -73,38 +74,65 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         }
 
         public void bind(Transaction transaction) {
+            if (transaction == null) {
+                return;
+            }
+            
             // Set transaction title based on type
-            switch (transaction.getType()) {
-                case "transfer":
-                    transactionTitle.setText("Chuyển tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
-                    break;
-                case "deposit":
-                    transactionTitle.setText("Nạp tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
-                    break;
-                case "withdraw":
-                    transactionTitle.setText("Rút tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
-                    break;
-                case "payment":
-                    transactionTitle.setText("Thanh toán");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
-                    break;
-                default:
-                    transactionTitle.setText("Giao dịch");
-                    break;
+            String transactionType = transaction.getType();
+            if (transactionType != null) {
+                switch (transactionType) {
+                    case "transfer":
+                        if (transactionTitle != null) {
+                            transactionTitle.setText("Chuyển tiền");
+                        }
+                        if (transactionIcon != null) {
+                            transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                        }
+                        break;
+                    case "deposit":
+                        if (transactionTitle != null) {
+                            transactionTitle.setText("Nạp tiền");
+                        }
+                        if (transactionIcon != null) {
+                            transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                        }
+                        break;
+                    case "withdraw":
+                        if (transactionTitle != null) {
+                            transactionTitle.setText("Rút tiền");
+                        }
+                        if (transactionIcon != null) {
+                            transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                        }
+                        break;
+                    case "payment":
+                        if (transactionTitle != null) {
+                            transactionTitle.setText("Thanh toán");
+                        }
+                        if (transactionIcon != null) {
+                            transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                        }
+                        break;
+                    default:
+                        if (transactionTitle != null) {
+                            transactionTitle.setText("Giao dịch");
+                        }
+                        break;
+                }
             }
 
             // Set description - using basic info from original model
-            if (transaction.getToAccountId() != null) {
-                transactionDescription.setText("Đến TK: " + transaction.getToAccountId());
-            } else {
-                transactionDescription.setText("Không có mô tả");
+            if (transactionDescription != null) {
+                if (transaction.getToAccountId() != null) {
+                    transactionDescription.setText("Đến TK: " + transaction.getToAccountId());
+                } else {
+                    transactionDescription.setText("Không có mô tả");
+                }
             }
 
             // Set date
-            if (transaction.getTimestamp() != null) {
+            if (transactionDate != null && transaction.getTimestamp() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
                 transactionDate.setText(sdf.format(transaction.getTimestamp()));
             }
@@ -113,50 +141,63 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
             String amountText;
             int amountColor;
             
-            if (transaction.getType().equals("deposit")) {
+            if ("deposit".equals(transactionType)) {
                 amountText = "+" + formatCurrency(transaction.getAmount());
-                amountColor = context.getColor(R.color.success);
+                amountColor = ContextCompat.getColor(context, R.color.success);
             } else {
                 amountText = "-" + formatCurrency(transaction.getAmount());
-                amountColor = context.getColor(R.color.error);
+                amountColor = ContextCompat.getColor(context, R.color.error);
             }
             
-            transactionAmount.setText(amountText);
-            transactionAmount.setTextColor(amountColor);
+            if (transactionAmount != null) {
+                transactionAmount.setText(amountText);
+                transactionAmount.setTextColor(amountColor);
+            }
 
             // Set status
             String statusText;
             int statusColor;
             
-            switch (transaction.getStatus()) {
-                case "completed":
-                    statusText = "Thành công";
-                    statusColor = context.getColor(R.color.success);
-                    break;
-                case "pending":
-                    statusText = "Đang xử lý";
-                    statusColor = context.getColor(R.color.warning);
-                    break;
-                case "failed":
-                    statusText = "Thất bại";
-                    statusColor = context.getColor(R.color.error);
-                    break;
-                case "cancelled":
-                    statusText = "Đã hủy";
-                    statusColor = context.getColor(R.color.text_hint);
-                    break;
-                default:
-                    statusText = "Không rõ";
-                    statusColor = context.getColor(R.color.text_secondary);
-                    break;
+            String status = transaction.getStatus();
+            if (status != null) {
+                switch (status) {
+                    case "completed":
+                        statusText = "Thành công";
+                        statusColor = ContextCompat.getColor(context, R.color.success);
+                        break;
+                    case "pending":
+                        statusText = "Đang xử lý";
+                        statusColor = ContextCompat.getColor(context, R.color.warning);
+                        break;
+                    case "failed":
+                        statusText = "Thất bại";
+                        statusColor = ContextCompat.getColor(context, R.color.error);
+                        break;
+                    case "cancelled":
+                        statusText = "Đã hủy";
+                        statusColor = ContextCompat.getColor(context, R.color.text_hint);
+                        break;
+                    default:
+                        statusText = "Không rõ";
+                        statusColor = ContextCompat.getColor(context, R.color.text_secondary);
+                        break;
+                }
+            } else {
+                statusText = "Không rõ";
+                statusColor = ContextCompat.getColor(context, R.color.text_secondary);
             }
             
-            transactionStatus.setText(statusText);
-            transactionStatus.setTextColor(statusColor);
+            if (transactionStatus != null) {
+                transactionStatus.setText(statusText);
+                transactionStatus.setTextColor(statusColor);
+            }
 
             // Set click listener
-            if (listener != null) {
+            if (cardView != null && listener != null) {
                 cardView.setOnClickListener(v -> listener.onTransactionClick(transaction));
+            } else if (itemView != null && listener != null) {
+                // Fallback: use itemView if cardView is null
+                itemView.setOnClickListener(v -> listener.onTransactionClick(transaction));
             }
         }
 

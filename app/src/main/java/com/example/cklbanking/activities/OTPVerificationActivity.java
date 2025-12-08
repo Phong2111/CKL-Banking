@@ -2,6 +2,8 @@ package com.example.cklbanking.activities;
 
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
@@ -91,7 +93,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
+        toolbar.setNavigationOnClickListener(v -> finish());
     }
 
     private void setupListeners() {
@@ -154,7 +156,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         // TODO: Verify OTP with backend
         // For now, accept any 6-digit code
-        new android.os.Handler().postDelayed(() -> {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
             showLoading(false);
             
             if (otpCode.equals("123456") || otpCode.length() == 6) {
