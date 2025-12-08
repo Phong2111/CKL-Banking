@@ -342,6 +342,7 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         // Get all recent transactions (will filter by user's accounts if needed)
         // For now, just get recent transactions - can be improved later
         db.collection("transactions")
+                .whereEqualTo("userId", userId) // QUAN TRỌNG: Chỉ lấy của user này
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(5)
                 .get()
