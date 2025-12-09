@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.cklbanking.R;
@@ -73,19 +72,19 @@ public class AccountAdapter extends RecyclerView.Adapter<AccountAdapter.AccountV
             switch (account.getAccountType()) {
                 case "checking":
                     typeName = "Tài khoản thanh toán";
-                    borderColor = ContextCompat.getColor(context, R.color.checking_account);
+                    borderColor = context.getColor(R.color.checking_account);
                     break;
                 case "saving":
                     typeName = "Tài khoản tiết kiệm";
-                    borderColor = ContextCompat.getColor(context, R.color.saving_account);
+                    borderColor = context.getColor(R.color.saving_account);
                     break;
                 case "mortgage":
                     typeName = "Tài khoản vay thế chấp";
-                    borderColor = ContextCompat.getColor(context, R.color.mortgage_account);
+                    borderColor = context.getColor(R.color.mortgage_account);
                     break;
                 default:
                     typeName = "Tài khoản";
-                    borderColor = ContextCompat.getColor(context, R.color.primary);
+                    borderColor = context.getColor(R.color.primary);
                     break;
             }
             

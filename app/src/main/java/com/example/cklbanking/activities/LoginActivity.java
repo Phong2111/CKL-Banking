@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,7 +21,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 public class LoginActivity extends AppCompatActivity {
 
     // UI Components
-    private com.google.android.material.textfield.TextInputEditText editEmail, editPassword;
+    private EditText editEmail, editPassword;
     private MaterialButton btnLogin;
     private TextView btnRegister, btnForgotPassword;
     private CircularProgressIndicator progressBar;
@@ -51,43 +52,25 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        editEmail = findViewById(R.id.editUsername);  // Fixed: layout uses editUsername
+        editEmail = findViewById(R.id.editEmail);
         editPassword = findViewById(R.id.editPassword);
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
         btnForgotPassword = findViewById(R.id.btnForgotPassword);
         progressBar = findViewById(R.id.progressBar);
-        
-        // Check if views are null
-        if (editEmail == null || editPassword == null || btnLogin == null) {
-            Toast.makeText(this, "Lỗi khởi tạo giao diện", Toast.LENGTH_SHORT).show();
-            finish();
-        }
     }
 
     private void setupListeners() {
-        if (btnLogin != null) {
-            btnLogin.setOnClickListener(v -> loginUser());
-        }
-        if (btnRegister != null) {
-            btnRegister.setOnClickListener(v -> {
-                startActivity(new Intent(this, RegisterActivity.class));
-            });
-        }
-        if (btnForgotPassword != null) {
-            btnForgotPassword.setOnClickListener(v -> {
-                startActivity(new Intent(this, ForgotPasswordActivity.class));
-            });
-        }
+        btnLogin.setOnClickListener(v -> loginUser());
+        btnRegister.setOnClickListener(v -> {
+            startActivity(new Intent(this, RegisterActivity.class));
+        });
+        btnForgotPassword.setOnClickListener(v -> {
+            startActivity(new Intent(this, ForgotPasswordActivity.class));
+        });
     }
 
     private void loginUser() {
-        // Check if views are initialized
-        if (editEmail == null || editPassword == null) {
-            Toast.makeText(this, "Lỗi: Giao diện chưa được khởi tạo", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
         String email = editEmail.getText().toString().trim();
         String password = editPassword.getText().toString().trim();
 
@@ -161,23 +144,11 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void showProgress(boolean show) {
-        if (progressBar != null) {
-            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
-        if (btnLogin != null) {
-            btnLogin.setEnabled(!show);
-        }
-        if (btnRegister != null) {
-            btnRegister.setEnabled(!show);
-        }
-        if (btnForgotPassword != null) {
-            btnForgotPassword.setEnabled(!show);
-        }
-        if (editEmail != null) {
-            editEmail.setEnabled(!show);
-        }
-        if (editPassword != null) {
-            editPassword.setEnabled(!show);
-        }
+        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        btnLogin.setEnabled(!show);
+        btnRegister.setEnabled(!show);
+        btnForgotPassword.setEnabled(!show);
+        editEmail.setEnabled(!show);
+        editPassword.setEnabled(!show);
     }
 }
