@@ -207,6 +207,7 @@ public class CustomerDashboardActivity extends AppCompatActivity {
     private void loadRecentTransactions() {
         // Get all transactions
         db.collection("transactions")
+                .whereEqualTo("userId", userId) // QUAN TRỌNG: Chỉ lấy của user này
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(5)
                 .get()
