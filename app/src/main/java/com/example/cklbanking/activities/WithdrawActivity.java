@@ -196,7 +196,7 @@ public class WithdrawActivity extends AppCompatActivity {
     }
 
     private String formatCurrency(double amount) {
-        NumberFormat formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("vi-VN"));
+        NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
         return formatter.format(amount);
     }
 }

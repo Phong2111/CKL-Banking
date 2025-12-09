@@ -94,7 +94,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
+        toolbar.setNavigationOnClickListener(v -> onBackPressed());
     }
 
     private void setupRecyclerView() {

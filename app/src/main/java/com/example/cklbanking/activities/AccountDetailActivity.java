@@ -8,7 +8,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -116,7 +115,7 @@ public class AccountDetailActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
+        toolbar.setNavigationOnClickListener(v -> onBackPressed());
     }
 
     private void setupRecyclerView() {
@@ -175,14 +174,14 @@ public class AccountDetailActivity extends AppCompatActivity {
         switch (account.getAccountType()) {
             case "checking":
                 accountTypeName.setText("Tài khoản thanh toán");
-                toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.checking_account));
+                toolbar.setBackgroundColor(getColor(R.color.checking_account));
                 additionalInfoLayout.setVisibility(View.GONE);
                 statisticsCard.setVisibility(View.GONE);
                 break;
 
             case "saving":
                 accountTypeName.setText("Tài khoản tiết kiệm");
-                toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.saving_account));
+                toolbar.setBackgroundColor(getColor(R.color.saving_account));
                 additionalInfoLayout.setVisibility(View.VISIBLE);
                 statisticsCard.setVisibility(View.VISIBLE);
                 amountDueLayout.setVisibility(View.GONE);
@@ -200,7 +199,7 @@ public class AccountDetailActivity extends AppCompatActivity {
 
             case "mortgage":
                 accountTypeName.setText("Tài khoản vay thế chấp");
-                toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.mortgage_account));
+                toolbar.setBackgroundColor(getColor(R.color.mortgage_account));
                 additionalInfoLayout.setVisibility(View.VISIBLE);
                 statisticsCard.setVisibility(View.GONE);
                 amountDueLayout.setVisibility(View.VISIBLE);

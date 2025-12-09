@@ -55,10 +55,9 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        btnChangePassword.setOnClickListener(v -> {
-            Intent intent = new Intent(this, ChangePasswordActivity.class);
-            startActivity(intent);
-        });
+        btnChangePassword.setOnClickListener(v -> 
+            Toast.makeText(this, "Chức năng đổi mật khẩu đang phát triển", Toast.LENGTH_SHORT).show()
+        );
 
         switchBiometric.setOnCheckedChangeListener((buttonView, isChecked) -> 
             Toast.makeText(this, "Sinh trắc học: " + (isChecked ? "Bật" : "Tắt"), Toast.LENGTH_SHORT).show()

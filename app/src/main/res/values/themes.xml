@@ -22,7 +22,7 @@
 
     <style name="Theme.CKLBanking" parent="Base.Theme.CKLBanking" />
     
-    <style name="Theme.CKLBanking.NoActionBar" parent="Theme.CKLBanking">
+    <style name="Theme.CKLBanking.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>

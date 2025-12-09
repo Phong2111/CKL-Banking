@@ -50,17 +50,6 @@ public class CustomerProfileActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
-        
-        // Check if user is logged in
-        if (mAuth.getCurrentUser() == null) {
-            Toast.makeText(this, "Phiên đăng nhập đã hết hạn", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(this, LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-            return;
-        }
-        
         userId = mAuth.getCurrentUser().getUid();
 
         // Initialize Views
@@ -90,22 +79,14 @@ public class CustomerProfileActivity extends AppCompatActivity {
         profileAddress = findViewById(R.id.profileAddress);
         btnEditProfile = findViewById(R.id.btnEditProfile);
         progressBar = findViewById(R.id.progressBar);
-        
-        // Check if views are null
-        if (toolbar == null || profileName == null || profileEmail == null) {
-            Toast.makeText(this, "Lỗi khởi tạo giao diện", Toast.LENGTH_SHORT).show();
-            finish();
-        }
     }
 
     private void setupToolbar() {
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            if (getSupportActionBar() != null) {
-                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            }
-            toolbar.setNavigationOnClickListener(v -> finish());
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
+        toolbar.setNavigationOnClickListener(v -> onBackPressed());
     }
 
     private void setupImagePicker() {
@@ -125,12 +106,8 @@ public class CustomerProfileActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        if (btnEditProfile != null) {
-            btnEditProfile.setOnClickListener(v -> openEditProfile());
-        }
-        if (profileAvatar != null) {
-            profileAvatar.setOnClickListener(v -> selectImage());
-        }
+        btnEditProfile.setOnClickListener(v -> openEditProfile());
+        profileAvatar.setOnClickListener(v -> selectImage());
     }
 
     private void loadUserProfile() {
@@ -160,28 +137,16 @@ public class CustomerProfileActivity extends AppCompatActivity {
     private void updateUI() {
         if (currentUser == null) return;
 
-        if (profileName != null) {
-            profileName.setText(currentUser.getFullName());
-        }
-        if (profileEmail != null) {
-            profileEmail.setText(currentUser.getEmail());
-        }
-        if (profilePhone != null) {
-            profilePhone.setText(currentUser.getPhone() != null ? currentUser.getPhone() : "Chưa cập nhật");
-        }
+        profileName.setText(currentUser.getFullName());
+        profileEmail.setText(currentUser.getEmail());
+        profilePhone.setText(currentUser.getPhone() != null ? currentUser.getPhone() : "Chưa cập nhật");
         // Extended fields not in User model
-        if (profileDob != null) {
-            profileDob.setText("Chưa cập nhật");
-        }
-        if (profileIdNumber != null) {
-            profileIdNumber.setText("Chưa cập nhật");
-        }
-        if (profileAddress != null) {
-            profileAddress.setText("Chưa cập nhật");
-        }
+        profileDob.setText("Chưa cập nhật");
+        profileIdNumber.setText("Chưa cập nhật");
+        profileAddress.setText("Chưa cập nhật");
 
         // TODO: Load avatar from URL using Glide
-        // if (currentUser.getAvatarUrl() != null && profileAvatar != null) {
+        // if (currentUser.getAvatarUrl() != null) {
         //     Glide.with(this)
         //         .load(currentUser.getAvatarUrl())
         //         .into(profileAvatar);
@@ -205,9 +170,7 @@ public class CustomerProfileActivity extends AppCompatActivity {
     }
 
     private void showLoading(boolean show) {
-        if (progressBar != null) {
-            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
+        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     @Override
