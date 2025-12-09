@@ -155,7 +155,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
             transactionStatus.setTextColor(statusColor);
 
             // Set click listener
-            if (listener != null) {
+            if (listener != null && cardView != null) {
                 cardView.setOnClickListener(v -> listener.onTransactionClick(transaction));
             }
         }

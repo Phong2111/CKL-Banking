@@ -2,6 +2,8 @@ package com.example.cklbanking.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -33,7 +35,7 @@ public class CustomerDashboardActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private TextView welcomeName, totalBalance;
-    private MaterialCardView checkingAccountCard, savingAccountCard, mortgageAccountCard;
+    private MaterialCardView checkingAccountCard, savingAccountCard, mortgageAccountCard, btnProfile;
     private TextView checkingAccountBalance, savingAccountBalance, mortgageAmountDue;
     private LinearLayout btnTransfer, btnDeposit, btnWithdraw, btnMore;
     private TextView btnViewAllTransactions;
@@ -87,6 +89,7 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         checkingAccountCard = findViewById(R.id.checkingAccountCard);
         savingAccountCard = findViewById(R.id.savingAccountCard);
         mortgageAccountCard = findViewById(R.id.mortgageAccountCard);
+        btnProfile = findViewById(R.id.btnProfile);
         
         checkingAccountBalance = findViewById(R.id.checkingAccountBalance);
         savingAccountBalance = findViewById(R.id.savingAccountBalance);
@@ -104,17 +107,28 @@ public class CustomerDashboardActivity extends AppCompatActivity {
 
     private void setupToolbar() {
         setSupportActionBar(toolbar);
-        toolbar.inflateMenu(R.menu.menu_dashboard);
-        toolbar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_notifications) {
-                startActivity(new Intent(this, NotificationsActivity.class));
-                return true;
-            } else if (item.getItemId() == R.id.action_settings) {
-                startActivity(new Intent(this, SettingsActivity.class));
-                return true;
-            }
-            return false;
-        });
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_dashboard, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_notifications) {
+            startActivity(new Intent(this, NotificationsActivity.class));
+            return true;
+        } else if (id == R.id.action_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void setupRecyclerView() {
@@ -134,6 +148,7 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         savingAccountCard.setOnClickListener(v -> openAccountDetail("saving"));
         mortgageAccountCard.setOnClickListener(v -> openAccountDetail("mortgage"));
         
+        btnProfile.setOnClickListener(v -> openProfile());
         btnTransfer.setOnClickListener(v -> openTransferMoney());
         btnDeposit.setOnClickListener(v -> startActivity(new Intent(this, DepositActivity.class)));
         btnWithdraw.setOnClickListener(v -> startActivity(new Intent(this, WithdrawActivity.class)));
@@ -255,6 +270,11 @@ public class CustomerDashboardActivity extends AppCompatActivity {
 
     private void openTransactionHistory() {
         Intent intent = new Intent(this, TransactionHistoryActivity.class);
+        startActivity(intent);
+    }
+
+    private void openProfile() {
+        Intent intent = new Intent(this, CustomerProfileActivity.class);
         startActivity(intent);
     }
 
