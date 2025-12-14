@@ -13,6 +13,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.cklbanking.R;
 import com.example.cklbanking.models.Account;
+import com.example.cklbanking.services.OTPService;
+import com.example.cklbanking.services.TransactionService;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -49,11 +51,19 @@ public class TransferMoneyActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
 
+    // Services
+    private OTPService otpService;
+    private TransactionService transactionService;
+
     // Data
     private String userId;
+    private String userPhone;
+    private String userEmail;
+    private String ekycStatus;
     private List<Account> userAccounts;
     private Account selectedFromAccount;
     private String transferType = "internal";
+    private static final double HIGH_VALUE_THRESHOLD = 5000000; // 5 million VND
     private String[] vietnameseBanks = {
         "Vietcombank", "Techcombank", "BIDV", "VietinBank", "ACB",
         "MB Bank", "Sacombank", "VPBank", "Agribank", "TPBank"
@@ -67,7 +77,12 @@ public class TransferMoneyActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        otpService = new OTPService();
+        transactionService = new TransactionService();
         userId = mAuth.getCurrentUser().getUid();
+
+        // Load user info (phone and eKYC status)
+        loadUserInfo();
 
         // Initialize Views
         initViews();
@@ -208,6 +223,21 @@ public class TransferMoneyActivity extends AppCompatActivity {
         editAmount.setText(String.valueOf((int) amount));
     }
 
+    private void loadUserInfo() {
+        if (userId == null) return;
+
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        userPhone = documentSnapshot.getString("phone");
+                        userEmail = documentSnapshot.getString("email");
+                        ekycStatus = documentSnapshot.getString("ekycStatus");
+                    }
+                });
+    }
+
     private void processTransfer() {
         // Validate input
         if (selectedFromAccount == null) {
@@ -256,27 +286,73 @@ public class TransferMoneyActivity extends AppCompatActivity {
             }
         }
 
-        // Create transaction
-        createTransaction(toAccount, recipient, amount);
+        // Check eKYC status for high-value transactions
+        if (amount >= HIGH_VALUE_THRESHOLD) {
+            if (ekycStatus == null || !"verified".equals(ekycStatus)) {
+                Toast.makeText(this, 
+                    "Giao dịch giá trị cao yêu cầu xác thực eKYC. Vui lòng hoàn thành eKYC trước.", 
+                    Toast.LENGTH_LONG).show();
+                Intent intent = new Intent(this, EKYCActivity.class);
+                startActivity(intent);
+                return;
+            }
+        }
+
+        // Create final variables for use in lambda
+        final String finalToAccount = toAccount;
+        final String finalRecipient = recipient;
+        final double finalAmount = amount;
+
+        // Verify transaction before creating
+        showLoading(true);
+        transactionService.verifyTransaction(
+            selectedFromAccount.getAccountNumber(),
+            finalToAccount,
+            finalAmount,
+            userId,
+            transferType,
+            new TransactionService.TransactionVerificationCallback() {
+                @Override
+                public void onVerificationResult(boolean isValid, String message, 
+                                                Map<String, Object> verificationData) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        
+                        if (!isValid) {
+                            Toast.makeText(TransferMoneyActivity.this, message, 
+                                Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        
+                        // Transaction is valid, proceed to create transaction
+                        createTransaction(finalToAccount, finalRecipient, finalAmount, verificationData);
+                    });
+                }
+            }
+        );
     }
 
-    private void createTransaction(String toAccount, String recipientName, double amount) {
+    private void createTransaction(String toAccount, String recipientName, double amount,
+                                   Map<String, Object> verificationData) {
         showLoading(true);
 
-        // Create transaction document (using original Transaction model fields)
+        // Create transaction document with status "pending" - will be updated after OTP and payment
         Map<String, Object> transaction = new HashMap<>();
         transaction.put("fromAccountId", selectedFromAccount.getAccountNumber());
         transaction.put("toAccountId", toAccount);
         transaction.put("type", "transfer");
         transaction.put("amount", amount);
-        transaction.put("status", "pending");
+        transaction.put("status", "pending"); // Will be updated to "completed" after OTP and payment
         transaction.put("timestamp", com.google.firebase.Timestamp.now());
+        transaction.put("userId", userId); // Store userId for daily limit checking
         
-        // Store additional info in separate fields (not in model but in Firestore)
+        // Store additional info
         transaction.put("recipientName", recipientName);
         transaction.put("transferType", transferType);
         transaction.put("description", editMessage.getText().toString().trim());
         transaction.put("requiresOTP", true);
+        transaction.put("otpVerified", false);
+        transaction.put("paymentProcessed", false);
         
         if (transferType.equals("external")) {
             transaction.put("recipientBank", bankNameDropdown.getText().toString().trim());
@@ -285,15 +361,33 @@ public class TransferMoneyActivity extends AppCompatActivity {
         db.collection("transactions")
                 .add(transaction)
                 .addOnSuccessListener(documentReference -> {
-                    showLoading(false);
                     String transactionId = documentReference.getId();
                     
-                    // Navigate to OTP verification
+                    // Generate OTP for 2FA and send via email
+                    if (userEmail != null && !userEmail.isEmpty()) {
+                        otpService.generateOTP(transactionId, userId, userEmail);
+                    } else {
+                        // Fallback: try to get email from Firebase Auth
+                        String email = mAuth.getCurrentUser() != null ? 
+                            mAuth.getCurrentUser().getEmail() : null;
+                        if (email != null) {
+                            otpService.generateOTP(transactionId, userId, email);
+                        } else {
+                            Toast.makeText(this, 
+                                "Không tìm thấy email. Vui lòng cập nhật email trong hồ sơ.", 
+                                Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    
+                    showLoading(false);
+                    
+                    // Navigate to OTP verification (2FA required for all transactions)
                     Intent intent = new Intent(TransferMoneyActivity.this, 
                         com.example.cklbanking.activities.OTPVerificationActivity.class);
                     intent.putExtra("transaction_id", transactionId);
                     intent.putExtra("amount", amount);
                     intent.putExtra("recipient", recipientName);
+                    intent.putExtra("transfer_type", transferType);
                     startActivity(intent);
                     finish();
                 })

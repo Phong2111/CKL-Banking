@@ -20,29 +20,18 @@
             app:navigationIcon="@drawable/ic_back"/>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Map Container (Placeholder - Add Google Maps later) -->
+    <!-- Map Container with Goong Maps -->
     <FrameLayout
         android:id="@+id/mapContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
         
-        <!-- Temporary placeholder for Google Maps -->
-        <FrameLayout
-            android:id="@+id/mapPlaceholder"
+        <!-- Goong Maps WebView -->
+        <WebView
+            android:id="@+id/mapWebView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/background">
-            
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="Google Maps sẽ hiển thị ở đây\n\nCần thêm API Key"
-                android:textSize="16sp"
-                android:textColor="@color/text_secondary"
-                android:gravity="center"/>
-        </FrameLayout>
+            android:layout_height="match_parent"/>
     </FrameLayout>
 
     <!-- Bottom Sheet -->
@@ -223,7 +212,7 @@
         android:layout_gravity="end|top"
         app:layout_anchor="@id/mapContainer"
         app:layout_anchorGravity="end|top"
-        android:src="@drawable/ic_filter"
+        android:src="@drawable/ic_location"
         app:tint="@color/white"
         app:backgroundTint="@color/primary"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

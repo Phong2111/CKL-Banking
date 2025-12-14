@@ -8,7 +8,7 @@ public class Transaction {
     private String fromAccountId;
     private String toAccountId;
     private double amount;
-    private String type; // 'transfer', 'deposit', 'withdraw', 'bill_payment'
+    private String type; // 'transfer', 'deposit', 'withdraw', 'bill_payment', 'phone_recharge', 'flight_ticket', 'movie_ticket', 'hotel_booking', 'ecommerce_payment'
     private String status; // 'completed', 'pending', 'failed'
 
     @ServerTimestamp

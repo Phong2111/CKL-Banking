@@ -19,6 +19,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Goong Maps repository
+        maven {
+            url = uri("https://jitpack.io")
+        }
     }
 }
 rootProject.name = "CKL Banking"

@@ -56,30 +56,46 @@ public class UtilitiesActivity extends AppCompatActivity {
         toolbar.setNavigationOnClickListener(v -> finish());
 
         // Bill payments
-        btnElectricityBill.setOnClickListener(v -> 
-            showFeatureInDevelopment("Thanh toán tiền điện"));
-        btnWaterBill.setOnClickListener(v -> 
-            showFeatureInDevelopment("Thanh toán tiền nước"));
+        btnElectricityBill.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, BillPaymentActivity.class);
+            intent.putExtra("bill_type", "electricity");
+            startActivity(intent);
+        });
+        btnWaterBill.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, BillPaymentActivity.class);
+            intent.putExtra("bill_type", "water");
+            startActivity(intent);
+        });
         btnInternetBill.setOnClickListener(v -> 
             showFeatureInDevelopment("Thanh toán tiền internet"));
         
         // Mobile services
-        btnPhoneRecharge.setOnClickListener(v -> 
-            showFeatureInDevelopment("Nạp tiền điện thoại"));
+        btnPhoneRecharge.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, PhoneRechargeActivity.class);
+            startActivity(intent);
+        });
         btnDataPackage.setOnClickListener(v -> 
             showFeatureInDevelopment("Mua gói data"));
         btnTvCard.setOnClickListener(v -> 
             showFeatureInDevelopment("Mua thẻ truyền hình"));
         
         // Booking services
-        btnFlightTicket.setOnClickListener(v -> 
-            showFeatureInDevelopment("Đặt vé máy bay"));
-        btnMovieTicket.setOnClickListener(v -> 
-            showFeatureInDevelopment("Đặt vé xem phim"));
-        btnHotelBooking.setOnClickListener(v -> 
-            showFeatureInDevelopment("Đặt khách sạn"));
-        btnEcommerce.setOnClickListener(v -> 
-            showFeatureInDevelopment("Mua sắm online"));
+        btnFlightTicket.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, FlightTicketActivity.class);
+            startActivity(intent);
+        });
+        btnMovieTicket.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, MovieTicketActivity.class);
+            startActivity(intent);
+        });
+        btnHotelBooking.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, HotelBookingActivity.class);
+            startActivity(intent);
+        });
+        btnEcommerce.setOnClickListener(v -> {
+            Intent intent = new Intent(UtilitiesActivity.this, EcommercePaymentActivity.class);
+            startActivity(intent);
+        });
     }
 
     private void showFeatureInDevelopment(String featureName) {

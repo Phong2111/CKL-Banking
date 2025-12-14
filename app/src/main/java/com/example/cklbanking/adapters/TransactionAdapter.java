@@ -73,35 +73,88 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         }
 
         public void bind(Transaction transaction) {
-            // Set transaction title based on type
+            // Set transaction title and icon based on type
+            String description = "";
+            int iconRes = R.drawable.ic_transfer; // Default icon
+            
             switch (transaction.getType()) {
                 case "transfer":
                     transactionTitle.setText("Chuyển tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                    iconRes = R.drawable.ic_transfer;
+                    if (transaction.getToAccountId() != null) {
+                        description = "Đến TK: " + transaction.getToAccountId();
+                    } else {
+                        description = "Chuyển khoản";
+                    }
                     break;
                 case "deposit":
                     transactionTitle.setText("Nạp tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                    iconRes = R.drawable.ic_transfer;
+                    description = "Nạp vào tài khoản";
                     break;
                 case "withdraw":
                     transactionTitle.setText("Rút tiền");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                    iconRes = R.drawable.ic_transfer;
+                    description = "Rút từ tài khoản";
                     break;
-                case "payment":
-                    transactionTitle.setText("Thanh toán");
-                    transactionIcon.setImageResource(R.drawable.ic_launcher_foreground);
+                case "bill_payment":
+                    transactionTitle.setText("Thanh toán hóa đơn");
+                    iconRes = R.drawable.ic_electric;
+                    if (transaction.getToAccountId() != null) {
+                        description = transaction.getToAccountId(); // Provider name
+                    } else {
+                        description = "Thanh toán hóa đơn";
+                    }
+                    break;
+                case "phone_recharge":
+                    transactionTitle.setText("Nạp tiền điện thoại");
+                    iconRes = R.drawable.ic_phone;
+                    if (transaction.getToAccountId() != null) {
+                        description = transaction.getToAccountId(); // Telecom provider
+                    } else {
+                        description = "Nạp tiền điện thoại";
+                    }
+                    break;
+                case "flight_ticket":
+                    transactionTitle.setText("Đặt vé máy bay");
+                    iconRes = R.drawable.ic_flight;
+                    description = "Vé máy bay";
+                    break;
+                case "movie_ticket":
+                    transactionTitle.setText("Đặt vé xem phim");
+                    iconRes = R.drawable.ic_movie;
+                    if (transaction.getToAccountId() != null) {
+                        description = transaction.getToAccountId(); // Cinema name
+                    } else {
+                        description = "Vé xem phim";
+                    }
+                    break;
+                case "hotel_booking":
+                    transactionTitle.setText("Đặt khách sạn");
+                    iconRes = R.drawable.ic_hotel;
+                    if (transaction.getToAccountId() != null) {
+                        description = transaction.getToAccountId(); // Hotel name
+                    } else {
+                        description = "Đặt phòng khách sạn";
+                    }
+                    break;
+                case "ecommerce_payment":
+                    transactionTitle.setText("Thanh toán mua sắm");
+                    iconRes = R.drawable.ic_shopping;
+                    if (transaction.getToAccountId() != null) {
+                        description = transaction.getToAccountId(); // Merchant name
+                    } else {
+                        description = "Thanh toán online";
+                    }
                     break;
                 default:
                     transactionTitle.setText("Giao dịch");
+                    description = "Giao dịch khác";
                     break;
             }
-
-            // Set description - using basic info from original model
-            if (transaction.getToAccountId() != null) {
-                transactionDescription.setText("Đến TK: " + transaction.getToAccountId());
-            } else {
-                transactionDescription.setText("Không có mô tả");
-            }
+            
+            transactionIcon.setImageResource(iconRes);
+            transactionDescription.setText(description);
 
             // Set date
             if (transaction.getTimestamp() != null) {

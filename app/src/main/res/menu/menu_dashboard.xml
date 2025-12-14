@@ -15,4 +15,11 @@
         android:title="Cài đặt"
         app:iconTint="@color/white"
         app:showAsAction="always"/>
+    
+    <item
+        android:id="@+id/action_branch_locator"
+        android:icon="@drawable/ic_location"
+        android:title="Tìm chi nhánh"
+        app:iconTint="@color/white"
+        app:showAsAction="ifRoom"/>
 </menu>

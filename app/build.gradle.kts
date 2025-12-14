@@ -50,8 +50,17 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-analytics")
     implementation ("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-functions")
 
-    // Google Maps
+    // Goong Maps SDK
+    // TODO: Goong Maps SDK không có trên Maven Central
+    // Cần download SDK thủ công từ https://docs.goong.io/ và thêm vào project
+    // Hoặc sử dụng WebView với Goong Maps JavaScript API
+    // Tạm thời comment để project có thể build
+    // implementation("io.goong:goongsdk-maps:1.0.0")
+
+    // Google Maps (for fallback navigation)
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
 

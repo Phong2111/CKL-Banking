@@ -12,9 +12,14 @@ public class Account {
 
     // Dành cho 'saving'
     private double interestRate;
+    private int term; // Kỳ hạn (số tháng)
+    private Date openDate; // Ngày mở tài khoản
+    private Date maturityDate; // Ngày đáo hạn
 
     // Dành cho 'mortgage'
     private double monthlyPayment;
+    private double biweeklyPayment; // Số tiền trả mỗi 2 tuần
+    private double remainingBalance; // Số dư còn lại
 
     @ServerTimestamp
     private Date createdAt;
@@ -43,6 +48,21 @@ public class Account {
 
     public double getMonthlyPayment() { return monthlyPayment; }
     public void setMonthlyPayment(double monthlyPayment) { this.monthlyPayment = monthlyPayment; }
+
+    public double getBiweeklyPayment() { return biweeklyPayment; }
+    public void setBiweeklyPayment(double biweeklyPayment) { this.biweeklyPayment = biweeklyPayment; }
+
+    public double getRemainingBalance() { return remainingBalance; }
+    public void setRemainingBalance(double remainingBalance) { this.remainingBalance = remainingBalance; }
+
+    public int getTerm() { return term; }
+    public void setTerm(int term) { this.term = term; }
+
+    public Date getOpenDate() { return openDate; }
+    public void setOpenDate(Date openDate) { this.openDate = openDate; }
+
+    public Date getMaturityDate() { return maturityDate; }
+    public void setMaturityDate(Date maturityDate) { this.maturityDate = maturityDate; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

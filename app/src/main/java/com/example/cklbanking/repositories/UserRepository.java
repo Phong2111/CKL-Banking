@@ -4,6 +4,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.example.cklbanking.models.User; // Import model User
 
 public class UserRepository {
@@ -31,5 +32,34 @@ public class UserRepository {
     // (Bạn cũng có thể tạo các hàm cụ thể hơn)
     public Task<Void> updateUserField(String userId, String field, Object value) {
         return userCollection.document(userId).update(field, value);
+    }
+
+    // Dùng cho Officer: Cập nhật toàn bộ thông tin user
+    public Task<Void> updateUser(String userId, User user) {
+        return userCollection.document(userId).set(user);
+    }
+
+    // Dùng cho Officer: Lấy tất cả customers
+    public Query getAllCustomers() {
+        return userCollection.whereEqualTo("role", "customer");
+    }
+
+    // Dùng cho Officer: Tìm kiếm customer theo email
+    public Query searchCustomerByEmail(String email) {
+        return userCollection.whereEqualTo("role", "customer")
+                .whereEqualTo("email", email);
+    }
+
+    // Dùng cho Officer: Tìm kiếm customer theo số điện thoại
+    public Query searchCustomerByPhone(String phone) {
+        return userCollection.whereEqualTo("role", "customer")
+                .whereEqualTo("phone", phone);
+    }
+
+    // Dùng cho Officer: Tìm kiếm customer theo tên (fullName)
+    public Query searchCustomerByName(String name) {
+        return userCollection.whereEqualTo("role", "customer")
+                .whereGreaterThanOrEqualTo("fullName", name)
+                .whereLessThanOrEqualTo("fullName", name + "\uf8ff");
     }
 }
