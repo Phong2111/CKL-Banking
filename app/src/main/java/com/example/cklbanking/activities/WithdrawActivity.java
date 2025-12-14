@@ -2,6 +2,7 @@ package com.example.cklbanking.activities;
 
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
@@ -13,18 +14,21 @@ import androidx.appcompat.widget.Toolbar;
 
 import com.example.cklbanking.R;
 import com.example.cklbanking.models.Account;
+import com.example.cklbanking.models.Transaction;
+import com.example.cklbanking.repositories.AccountRepository;
+import com.example.cklbanking.repositories.TransactionRepository;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class WithdrawActivity extends AppCompatActivity {
 
@@ -35,11 +39,15 @@ public class WithdrawActivity extends AppCompatActivity {
     private RadioGroup radioGroupMethod;
     private MaterialButton btnWithdraw;
     private MaterialButton btn500k, btn1m, btn2m, btn3m, btn5m, btn10m;
+    private CircularProgressIndicator progressBar;
     
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
+    private AccountRepository accountRepository;
+    private TransactionRepository transactionRepository;
     private List<Account> accounts;
     private String selectedAccountId;
+    private Account selectedAccount;
     private double availableBalance = 0;
 
     @Override
@@ -49,11 +57,20 @@ public class WithdrawActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        accountRepository = new AccountRepository();
+        transactionRepository = new TransactionRepository();
 
         initViews();
         setupToolbar();
         setupListeners();
-        loadAccounts();
+        
+        // Kiểm tra xem có account_id từ intent không
+        String accountIdFromIntent = getIntent().getStringExtra("account_id");
+        if (accountIdFromIntent != null) {
+            loadSpecificAccount(accountIdFromIntent);
+        } else {
+            loadAccounts();
+        }
     }
 
     private void initViews() {
@@ -70,6 +87,32 @@ public class WithdrawActivity extends AppCompatActivity {
         btn3m = findViewById(R.id.btn3m);
         btn5m = findViewById(R.id.btn5m);
         btn10m = findViewById(R.id.btn10m);
+        progressBar = findViewById(R.id.progressBar);
+    }
+    
+    private void loadSpecificAccount(String accountId) {
+        accountRepository.getAccountById(accountId)
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        selectedAccount = documentSnapshot.toObject(Account.class);
+                        if (selectedAccount != null) {
+                            selectedAccount.setAccountId(documentSnapshot.getId());
+                            selectedAccountId = accountId;
+                            availableBalance = selectedAccount.getBalance();
+                            updateAvailableBalanceDisplay();
+                            spinnerAccount.setVisibility(View.GONE);
+                        }
+                    } else {
+                        loadAccounts();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    loadAccounts();
+                });
+    }
+    
+    private void updateAvailableBalanceDisplay() {
+        textAvailableBalance.setText("Số dư khả dụng: " + formatCurrency(availableBalance));
     }
 
     private void setupToolbar() {
@@ -94,8 +137,7 @@ public class WithdrawActivity extends AppCompatActivity {
     private void loadAccounts() {
         String userId = mAuth.getCurrentUser().getUid();
         
-        db.collection("accounts")
-                .whereEqualTo("userId", userId)
+        accountRepository.getAccountsForUser(userId)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     accounts = new ArrayList<>();
@@ -103,6 +145,7 @@ public class WithdrawActivity extends AppCompatActivity {
                     
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Account account = document.toObject(Account.class);
+                        account.setAccountId(document.getId());
                         accounts.add(account);
                         accountNames.add(account.getAccountNumber() + " - " + account.getAccountType());
                     }
@@ -115,6 +158,10 @@ public class WithdrawActivity extends AppCompatActivity {
                     if (!accounts.isEmpty()) {
                         updateAvailableBalance(0);
                     }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Lỗi tải danh sách tài khoản: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
                 });
         
         spinnerAccount.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -130,8 +177,10 @@ public class WithdrawActivity extends AppCompatActivity {
 
     private void updateAvailableBalance(int position) {
         if (accounts != null && position < accounts.size()) {
-            availableBalance = accounts.get(position).getBalance();
-            textAvailableBalance.setText("Số dư khả dụng: " + formatCurrency(availableBalance));
+            selectedAccount = accounts.get(position);
+            selectedAccountId = selectedAccount.getAccountId();
+            availableBalance = selectedAccount.getBalance();
+            updateAvailableBalanceDisplay();
         }
     }
 
@@ -143,7 +192,13 @@ public class WithdrawActivity extends AppCompatActivity {
             return;
         }
         
-        double amount = Double.parseDouble(amountStr);
+        double amount;
+        try {
+            amount = Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            editAmount.setError("Số tiền không hợp lệ");
+            return;
+        }
         
         if (amount < 100000) {
             editAmount.setError("Số tiền rút tối thiểu là 100.000 VNĐ");
@@ -155,32 +210,75 @@ public class WithdrawActivity extends AppCompatActivity {
             return;
         }
         
-        int selectedPos = spinnerAccount.getSelectedItemPosition();
-        if (selectedPos < 0 || accounts.isEmpty()) {
-            Toast.makeText(this, "Vui lòng chọn tài khoản", Toast.LENGTH_SHORT).show();
+        // Lấy account được chọn
+        if (selectedAccountId == null) {
+            int selectedPos = spinnerAccount.getSelectedItemPosition();
+            if (selectedPos < 0 || accounts == null || accounts.isEmpty()) {
+                Toast.makeText(this, "Vui lòng chọn tài khoản", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            selectedAccount = accounts.get(selectedPos);
+            selectedAccountId = selectedAccount.getAccountId();
+        }
+        
+        if (selectedAccount == null) {
+            // Load account info
+            accountRepository.getAccountById(selectedAccountId)
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            selectedAccount = documentSnapshot.toObject(Account.class);
+                            if (selectedAccount != null) {
+                                selectedAccount.setAccountId(documentSnapshot.getId());
+                                performWithdraw(amount);
+                            }
+                        }
+                    });
             return;
         }
         
-        selectedAccountId = accounts.get(selectedPos).getAccountId();
+        performWithdraw(amount);
+    }
+    
+    private void performWithdraw(double amount) {
+        // Tính số dư mới
+        double newBalance = selectedAccount.getBalance() - amount;
         
-        // Create withdraw request
-        Map<String, Object> withdrawRequest = new HashMap<>();
-        withdrawRequest.put("accountId", selectedAccountId);
-        withdrawRequest.put("amount", amount);
-        withdrawRequest.put("method", getSelectedMethod());
-        withdrawRequest.put("status", "pending");
-        withdrawRequest.put("timestamp", System.currentTimeMillis());
-        withdrawRequest.put("userId", mAuth.getCurrentUser().getUid());
+        if (newBalance < 0) {
+            editAmount.setError("Số dư không đủ");
+            return;
+        }
+        
+        // Tạo transaction
+        Transaction transaction = new Transaction();
+        transaction.setFromAccountId(selectedAccountId);
+        transaction.setToAccountId(selectedAccountId); // Withdraw từ chính account đó
+        transaction.setAmount(amount);
+        transaction.setType("withdraw");
+        transaction.setStatus("completed");
         
         btnWithdraw.setEnabled(false);
+        progressBar.setVisibility(View.VISIBLE);
         
-        db.collection("withdraw_requests")
-                .add(withdrawRequest)
-                .addOnSuccessListener(documentReference -> {
-                    Toast.makeText(this, "Yêu cầu rút tiền đã được gửi!", Toast.LENGTH_SHORT).show();
+        // Sử dụng batch write để đảm bảo atomicity
+        WriteBatch batch = db.batch();
+        
+        // Update balance
+        batch.update(db.collection("accounts").document(selectedAccountId), "balance", newBalance);
+        
+        // Create transaction
+        String transactionId = db.collection("transactions").document().getId();
+        transaction.setTransactionId(transactionId);
+        batch.set(db.collection("transactions").document(transactionId), transaction);
+        
+        // Commit batch
+        batch.commit()
+                .addOnSuccessListener(aVoid -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(this, "Rút tiền thành công!", Toast.LENGTH_SHORT).show();
                     finish();
                 })
                 .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
                     btnWithdraw.setEnabled(true);
                     Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });

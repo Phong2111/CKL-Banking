@@ -15,6 +15,8 @@ import com.example.cklbanking.R;
 import com.example.cklbanking.adapters.TransactionAdapter;
 import com.example.cklbanking.models.Account;
 import com.example.cklbanking.models.Transaction;
+import com.example.cklbanking.repositories.AccountRepository;
+import com.example.cklbanking.repositories.TransactionRepository;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -24,8 +26,11 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class AccountDetailActivity extends AppCompatActivity {
 
@@ -45,6 +50,10 @@ public class AccountDetailActivity extends AppCompatActivity {
     // Firebase
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
+    
+    // Repositories
+    private AccountRepository accountRepository;
+    private TransactionRepository transactionRepository;
 
     // Data
     private String accountId;
@@ -52,6 +61,9 @@ public class AccountDetailActivity extends AppCompatActivity {
     private Account account;
     private List<Transaction> transactions;
     private TransactionAdapter adapter;
+    
+    // Date formatter
+    private SimpleDateFormat dateFormatter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +73,13 @@ public class AccountDetailActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        
+        // Initialize Repositories
+        accountRepository = new AccountRepository();
+        transactionRepository = new TransactionRepository();
+        
+        // Initialize Date Formatter
+        dateFormatter = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
 
         // Get intent data
         accountId = getIntent().getStringExtra("account_id");
@@ -141,15 +160,16 @@ public class AccountDetailActivity extends AppCompatActivity {
 
         showLoading(true);
 
-        db.collection("accounts")
-                .document(accountId)
-                .get()
+        accountRepository.getAccountById(accountId)
                 .addOnSuccessListener(documentSnapshot -> {
                     showLoading(false);
                     
                     if (documentSnapshot.exists()) {
                         account = documentSnapshot.toObject(Account.class);
-                        updateUI();
+                        if (account != null) {
+                            account.setAccountId(documentSnapshot.getId());
+                            updateUI();
+                        }
                     } else {
                         Toast.makeText(this, "Không tìm thấy thông tin tài khoản", 
                             Toast.LENGTH_SHORT).show();
@@ -187,14 +207,37 @@ public class AccountDetailActivity extends AppCompatActivity {
                 amountDueLayout.setVisibility(View.GONE);
                 
                 // Show interest rate
-                interestRateValue.setText(String.format("%.1f%%/năm", account.getInterestRate()));
+                if (account.getInterestRate() > 0) {
+                    interestRateValue.setText(String.format(Locale.getDefault(), "%.2f%%/năm", account.getInterestRate()));
+                } else {
+                    interestRateValue.setText("Chưa có");
+                }
                 
-                // Show statistics
-                savingTerm.setText("12 tháng");
-                openDate.setText("01/01/2024");
-                maturityDate.setText("01/01/2025");
-                double expectedInt = account.getBalance() * account.getInterestRate() / 100;
-                expectedInterest.setText(formatCurrency(expectedInt));
+                // Show statistics - sử dụng dữ liệu thực từ model
+                if (account.getTerm() > 0) {
+                    savingTerm.setText(account.getTerm() + " tháng");
+                } else {
+                    savingTerm.setText("Chưa xác định");
+                }
+                
+                if (account.getOpenDate() != null) {
+                    openDate.setText(dateFormatter.format(account.getOpenDate()));
+                } else {
+                    openDate.setText("Chưa có");
+                }
+                
+                if (account.getMaturityDate() != null) {
+                    maturityDate.setText(dateFormatter.format(account.getMaturityDate()));
+                } else {
+                    maturityDate.setText("Chưa có");
+                }
+                
+                // Tính lợi nhuận hàng tháng = (Balance × Interest Rate) / 12
+                double monthlyProfit = 0;
+                if (account.getInterestRate() > 0 && account.getBalance() > 0) {
+                    monthlyProfit = (account.getBalance() * account.getInterestRate()) / 12.0 / 100.0;
+                }
+                expectedInterest.setText(formatCurrency(monthlyProfit) + "/tháng");
                 break;
 
             case "mortgage":
@@ -204,8 +247,19 @@ public class AccountDetailActivity extends AppCompatActivity {
                 statisticsCard.setVisibility(View.GONE);
                 amountDueLayout.setVisibility(View.VISIBLE);
                 
-                // Show monthly payment (amountDue not in model)
-                amountDueValue.setText(formatCurrency(account.getMonthlyPayment()));
+                // Show monthly payment
+                if (account.getMonthlyPayment() > 0) {
+                    amountDueValue.setText(formatCurrency(account.getMonthlyPayment()) + "/tháng");
+                } else {
+                    amountDueValue.setText("Chưa có");
+                }
+                
+                // Hiển thị bi-weekly payment nếu có
+                if (account.getBiweeklyPayment() > 0) {
+                    // Có thể thêm TextView riêng hoặc hiển thị trong cùng layout
+                    // Tạm thời hiển thị trong interestRateValue (không dùng cho mortgage)
+                    interestRateValue.setText(formatCurrency(account.getBiweeklyPayment()) + "/2 tuần");
+                }
                 break;
         }
     }
@@ -213,9 +267,8 @@ public class AccountDetailActivity extends AppCompatActivity {
     private void loadTransactions() {
         if (accountId == null) return;
 
-        db.collection("transactions")
-                .whereEqualTo("accountId", accountId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
+        // Sử dụng TransactionRepository - query theo fromAccountId
+        transactionRepository.getTransactionsByAccount(accountId)
                 .limit(10)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
@@ -223,6 +276,7 @@ public class AccountDetailActivity extends AppCompatActivity {
                     
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Transaction transaction = document.toObject(Transaction.class);
+                        transaction.setTransactionId(document.getId());
                         transactions.add(transaction);
                     }
                     
@@ -241,11 +295,15 @@ public class AccountDetailActivity extends AppCompatActivity {
     }
 
     private void openDeposit() {
-        Toast.makeText(this, "Chức năng nạp tiền đang phát triển", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, DepositActivity.class);
+        intent.putExtra("account_id", accountId);
+        startActivity(intent);
     }
 
     private void openWithdraw() {
-        Toast.makeText(this, "Chức năng rút tiền đang phát triển", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, WithdrawActivity.class);
+        intent.putExtra("account_id", accountId);
+        startActivity(intent);
     }
 
     private void openTransactionHistory() {

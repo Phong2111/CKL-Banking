@@ -61,24 +61,61 @@ public class CustomerDashboardActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
-        userId = mAuth.getCurrentUser().getUid();
-
-        // Initialize Views
+        
+        // Initialize Views trước (không phụ thuộc vào user data)
         initViews();
-
-        // Setup Toolbar
         setupToolbar();
-
-        // Setup RecyclerView
         setupRecyclerView();
-
-        // Setup Listeners
         setupListeners();
-
+        
+        // Lấy userId ngay (không cần reload nếu đã có)
+        userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+        
+        // Check permission - only customers can access
+        if (userId == null) {
+            android.util.Log.w("CustomerDashboard", "No user found, redirecting to login");
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
+        
+        android.util.Log.d("CustomerDashboard", "User ID: " + userId);
+        
+        // Check user role
+        checkUserRole();
+        
         // Load data
         loadUserProfile();
         loadAccounts();
         loadRecentTransactions();
+    }
+
+    private void checkUserRole() {
+        if (userId == null) return;
+
+        db.collection("users").document(userId).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        String role = documentSnapshot.getString("role");
+                        if (!"customer".equals(role)) {
+                            // Not a customer, redirect to appropriate dashboard
+                            if ("staff".equals(role) || "officer".equals(role)) {
+                                Intent intent = new Intent(this, OfficerDashboardActivity.class);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                startActivity(intent);
+                            } else {
+                                mAuth.signOut();
+                                startActivity(new Intent(this, LoginActivity.class));
+                            }
+                            finish();
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    // Error checking role, allow access but log
+                });
     }
 
     private void initViews() {
@@ -126,6 +163,9 @@ public class CustomerDashboardActivity extends AppCompatActivity {
             return true;
         } else if (id == R.id.action_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        } else if (id == R.id.action_branch_locator) {
+            startActivity(new Intent(this, BranchLocatorActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);

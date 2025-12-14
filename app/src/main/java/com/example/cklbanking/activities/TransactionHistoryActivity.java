@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.cklbanking.R;
 import com.example.cklbanking.adapters.TransactionAdapter;
 import com.example.cklbanking.models.Transaction;
+import com.example.cklbanking.repositories.TransactionRepository;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -30,7 +31,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private ChipGroup filterChipGroup;
-    private Chip chipAll, chipTransfer, chipDeposit, chipWithdraw, chipBillPayment;
+    private Chip chipAll, chipTransfer, chipDeposit, chipWithdraw, chipUtilities;
     private MaterialButton btnDateFilter;
     private RecyclerView transactionRecyclerView;
     private View emptyStateLayout;
@@ -39,6 +40,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     // Firebase
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
+    private TransactionRepository transactionRepository;
 
     // Data
     private String accountId; // Optional - filter by account
@@ -55,6 +57,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        transactionRepository = new TransactionRepository();
 
         // Get intent data
         accountId = getIntent().getStringExtra("account_id");
@@ -82,7 +85,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
         chipTransfer = findViewById(R.id.chipTransfer);
         chipDeposit = findViewById(R.id.chipDeposit);
         chipWithdraw = findViewById(R.id.chipWithdraw);
-        chipBillPayment = findViewById(R.id.chipBillPayment);
+        chipUtilities = findViewById(R.id.chipUtilities);
         btnDateFilter = findViewById(R.id.btnDateFilter);
         transactionRecyclerView = findViewById(R.id.transactionRecyclerView);
         emptyStateLayout = findViewById(R.id.emptyStateLayout);
@@ -118,8 +121,8 @@ public class TransactionHistoryActivity extends AppCompatActivity {
                 currentFilter = "deposit";
             } else if (selectedId == R.id.chipWithdraw) {
                 currentFilter = "withdraw";
-            } else if (selectedId == R.id.chipBillPayment) {
-                currentFilter = "payment";
+            } else if (selectedId == R.id.chipUtilities) {
+                currentFilter = "utilities";
             }
             
             filterTransactions();
@@ -131,13 +134,24 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     private void loadTransactions() {
         showLoading(true);
 
-        // Query transactions
-        Query query = db.collection("transactions")
-                .orderBy("timestamp", Query.Direction.DESCENDING);
-
-        // Filter by account if specified
+        // Query transactions using TransactionRepository
+        Query query;
         if (accountId != null) {
-            query = query.whereEqualTo("accountId", accountId);
+            // Load transactions for specific account
+            query = transactionRepository.getTransactionsByAccount(accountId);
+        } else {
+            // Load all transactions for current user
+            String userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+            if (userId != null) {
+                // Get all accounts for user, then get transactions for each
+                // For simplicity, we'll query all transactions and filter by userId later
+                // Or we can get all user's accounts first
+                query = db.collection("transactions")
+                        .orderBy("timestamp", Query.Direction.DESCENDING);
+            } else {
+                query = db.collection("transactions")
+                        .orderBy("timestamp", Query.Direction.DESCENDING);
+            }
         }
 
         query.get()
@@ -145,8 +159,19 @@ public class TransactionHistoryActivity extends AppCompatActivity {
                     showLoading(false);
                     allTransactions.clear();
                     
+                    String userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+                    
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Transaction transaction = document.toObject(Transaction.class);
+                        transaction.setTransactionId(document.getId());
+                        
+                        // If no accountId filter, only show transactions related to user's accounts
+                        if (accountId == null && userId != null) {
+                            // Check if transaction is from or to user's account
+                            // We need to check if fromAccountId or toAccountId belongs to user
+                            // For now, we'll show all transactions - can be improved later
+                        }
+                        
                         allTransactions.add(transaction);
                     }
                     
@@ -165,6 +190,19 @@ public class TransactionHistoryActivity extends AppCompatActivity {
 
         if (currentFilter.equals("all")) {
             filteredTransactions.addAll(allTransactions);
+        } else if (currentFilter.equals("utilities")) {
+            // Filter all utility payment types
+            for (Transaction transaction : allTransactions) {
+                String type = transaction.getType();
+                if (type != null && (type.equals("bill_payment") || 
+                    type.equals("phone_recharge") || 
+                    type.equals("flight_ticket") || 
+                    type.equals("movie_ticket") || 
+                    type.equals("hotel_booking") || 
+                    type.equals("ecommerce_payment"))) {
+                    filteredTransactions.add(transaction);
+                }
+            }
         } else {
             for (Transaction transaction : allTransactions) {
                 if (transaction.getType().equals(currentFilter)) {

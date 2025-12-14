@@ -129,11 +129,21 @@ public class RegisterActivity extends AppCompatActivity {
         db.collection("users").document(userId)
                 .set(user)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Đăng ký thành công!", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(this, CustomerDashboardActivity.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
+                    // Đợi một chút để đảm bảo Firebase Auth đã sync xong
+                    android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+                    handler.postDelayed(() -> {
+                        // Kiểm tra lại user để đảm bảo đã được tạo
+                        FirebaseAuth.getInstance().getCurrentUser().reload().addOnCompleteListener(reloadTask -> {
+                            Toast.makeText(RegisterActivity.this, "Đăng ký thành công!", Toast.LENGTH_SHORT).show();
+                            
+                            // Navigate to Customer Dashboard
+                            Intent intent = new Intent(RegisterActivity.this, CustomerDashboardActivity.class);
+                            // Chỉ clear top activities, không clear toàn bộ task
+                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                            startActivity(intent);
+                            finish();
+                        });
+                    }, 500); // Đợi 500ms để Firebase sync
                 })
                 .addOnFailureListener(e -> {
                     btnRegister.setEnabled(true);

@@ -76,12 +76,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- Camera Preview Placeholder -->
-                <FrameLayout
-                    android:id="@+id/cameraPreview"
+                <!-- Camera Preview -->
+                <androidx.camera.view.PreviewView
+                    android:id="@+id/previewView"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@color/text_secondary"/>
+                    android:layout_height="match_parent"/>
 
                 <!-- Face Detection Overlay -->
                 <View

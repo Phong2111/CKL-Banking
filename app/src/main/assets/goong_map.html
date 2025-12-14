@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goong Maps</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <!-- Load Goong Maps CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@goongmaps/goong-js@latest/dist/goong-js.css" />
+    <!-- Load Leaflet CSS (fallback option) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script>
+        // Biến toàn cục để lưu map
+        var map = null;
+        var apiKey = null;
+        var goongjsLoaded = false;
+        
+        // Hàm khởi tạo map
+        function initMap() {
+            // Kiểm tra xem goongjs hoặc goong đã load chưa (thử nhiều tên biến)
+            var GoongMap = window.goongjs || window.goong || window.GoongMap;
+            
+            if (typeof GoongMap === 'undefined' && typeof goongjs === 'undefined' && typeof goong === 'undefined') {
+                console.log('Waiting for Goong Maps library to load...');
+                setTimeout(initMap, 100);
+                return;
+            }
+            
+            // Lấy API key từ Android hoặc default
+            apiKey = window.GoongAPIKey || 'zMi4zlEstPrasQB229rvLFuVvI7Vo803mQcYsn7g';
+            
+            if (!apiKey || apiKey === 'YOUR_GOONG_API_KEY_HERE') {
+                console.error('Goong API key not found!');
+                document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center;">Lỗi: Không tìm thấy API key</div>';
+                return;
+            }
+            
+            try {
+                // Kiểm tra xem goongjs có tồn tại không
+                if (typeof goongjs === 'undefined') {
+                    throw new Error('goongjs is not defined');
+                }
+                
+                // Khởi tạo map với API key
+                // Goong Maps JS sử dụng accessToken
+                console.log('Creating map with API key (length: ' + apiKey.length + ')...');
+                
+                // Thử khởi tạo map với accessToken
+                map = new goongjs.Map({
+                    container: 'map',
+                    style: 'https://tiles.goong.io/assets/goong_map_web.json',
+                    center: [106.6297, 10.8231], // Ho Chi Minh City [lng, lat]
+                    zoom: 13,
+                    accessToken: apiKey  // Goong Maps JS sử dụng accessToken
+                });
+                console.log('Map object created, waiting for style to load...');
+                
+                // Đợi map load xong
+                map.on('load', function() {
+                    console.log('Map loaded successfully');
+                    if (window.Android && window.Android.onMapReady) {
+                        window.Android.onMapReady();
+                    }
+                });
+                
+                map.on('error', function(e) {
+                    console.error('Map error event:', e);
+                    // Hiển thị lỗi chi tiết
+                    var errorMsg = 'Lỗi bản đồ: ';
+                    if (e.error) {
+                        errorMsg += e.error.message || JSON.stringify(e.error);
+                    } else if (e.message) {
+                        errorMsg += e.message;
+                    } else {
+                        try {
+                            errorMsg += JSON.stringify(e);
+                        } catch (err) {
+                            errorMsg += String(e);
+                        }
+                    }
+                    console.error('Detailed error:', errorMsg);
+                    // Log toàn bộ object để debug
+                    console.error('Full error object:', e);
+                    // Hiển thị lỗi trên UI
+                    try {
+                        var mapDiv = document.getElementById('map');
+                        if (mapDiv && (!map || !map.loaded())) {
+                            mapDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: red;">' + errorMsg + '</div>';
+                        }
+                    } catch (err) {
+                        console.error('Error displaying error message:', err);
+                    }
+                });
+                
+                // Thêm listener cho style events
+                map.on('style.load', function() {
+                    console.log('Map style loaded successfully');
+                });
+                
+                map.on('style.error', function(e) {
+                    console.error('Style error:', e);
+                    if (e.error) {
+                        console.error('Style error details:', e.error.message || e.error);
+                    }
+                });
+                
+                map.on('data', function(e) {
+                    if (e.dataType === 'style') {
+                        console.log('Style data loaded');
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center;">Lỗi khởi tạo bản đồ: ' + error.message + '<br>Vui lòng kiểm tra Logcat để xem chi tiết.</div>';
+            }
+        }
+        
+        // Sử dụng Leaflet với Goong tiles ngay lập tức
+        // Vì Goong Maps JS API có vấn đề với API key (403 Forbidden)
+        var useLeaflet = true;
+        
+        // Bỏ qua Goong Maps JS API, dùng Leaflet ngay
+        // Vì Goong Maps JS API có vấn đề với API key (403 Forbidden)
+        
+        // Load Leaflet với Goong tiles
+        function loadLeaflet() {
+            var leafletScript = document.createElement('script');
+            leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            leafletScript.onload = function() {
+                console.log('Leaflet loaded, initializing with Goong tiles');
+                initLeafletMap();
+            };
+            leafletScript.onerror = function() {
+                document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: red;">Lỗi: Không thể tải thư viện bản đồ.<br>Vui lòng kiểm tra kết nối internet.</div>';
+            };
+            document.head.appendChild(leafletScript);
+        }
+        
+        // Khởi tạo map với Leaflet
+        function initLeafletMap() {
+            apiKey = window.GoongAPIKey || 'zMi4zlEstPrasQB229rvLFuVvI7Vo803mQcYsn7g';
+            
+            // Sử dụng Leaflet với OpenStreetMap (mặc định)
+            // Center mặc định: TP.HCM, Việt Nam (sẽ được cập nhật khi có GPS location)
+            map = L.map('map').setView([10.8231, 106.6297], 13);
+            
+            // Sử dụng OpenStreetMap làm mặc định để đảm bảo map luôn hiển thị
+            var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+                minZoom: 1
+            });
+            osmLayer.addTo(map);
+            console.log('OpenStreetMap tiles loaded as default');
+            
+            // Thử load Goong tiles nếu có API key hợp lệ
+            if (apiKey && apiKey !== 'YOUR_GOONG_API_KEY_HERE') {
+                tryLoadGoongTiles(apiKey, osmLayer);
+            }
+            
+            if (window.Android && window.Android.onMapReady) {
+                window.Android.onMapReady();
+            }
+        }
+        
+        // Hàm để thử load Goong tiles (nếu có quyền) - sẽ thay thế OSM nếu thành công
+        function tryLoadGoongTiles(apiKey, osmLayer) {
+            // Goong tile layer - thử nhiều format URL khác nhau
+            // Theo tài liệu Goong: https://docs.goong.io/rest/map/
+            // Lưu ý: Goong tiles có thể cần API key có quyền truy cập Map Tiles service
+            var tileUrls = [
+                // Format 1: Standard Goong tiles với API key (theo tài liệu)
+                'https://tiles.goong.io/v1/{z}/{x}/{y}.png?api_key=' + apiKey,
+                // Format 2: Không có v1
+                'https://tiles.goong.io/{z}/{x}/{y}.png?api_key=' + apiKey,
+                // Format 3: Với access_token
+                'https://tiles.goong.io/v1/{z}/{x}/{y}.png?access_token=' + apiKey
+            ];
+            
+            var currentTileUrl = 0;
+            var goongLayer = null;
+            var successTiles = 0;
+            var errorTiles = 0;
+            
+            function tryGoongTile() {
+                if (currentTileUrl >= tileUrls.length) {
+                    console.log('All Goong tile URLs failed, keeping OpenStreetMap');
+                    return; // Giữ OSM
+                }
+                
+                console.log('Trying Goong tile URL:', tileUrls[currentTileUrl].substring(0, 50) + '...');
+                
+                goongLayer = L.tileLayer(tileUrls[currentTileUrl], {
+                    attribution: '© Goong Maps',
+                    maxZoom: 18,
+                    minZoom: 1,
+                    crossOrigin: true
+                });
+                
+                // Track tile loading để xác định xem Goong tiles có hoạt động không
+                goongLayer.on('tileload', function() {
+                    successTiles++;
+                    console.log('Goong tile loaded successfully (' + successTiles + ' tiles)');
+                    // Nếu có ít nhất 3 tiles load thành công, thay thế OSM bằng Goong
+                    if (successTiles >= 3 && osmLayer && map.hasLayer(osmLayer)) {
+                        console.log('Goong tiles working! Replacing OpenStreetMap with Goong tiles');
+                        map.removeLayer(osmLayer);
+                    }
+                });
+                
+                goongLayer.on('tileerror', function(error, tile) {
+                    errorTiles++;
+                    console.log('Goong tile error (' + errorTiles + ' errors, ' + successTiles + ' successes)');
+                    // Nếu có quá nhiều lỗi so với thành công, thử URL tiếp theo
+                    if (errorTiles > 10 && successTiles < 3) {
+                        console.log('Too many Goong tile errors, trying next URL...');
+                        if (map.hasLayer(goongLayer)) {
+                            map.removeLayer(goongLayer);
+                        }
+                        successTiles = 0;
+                        errorTiles = 0;
+                        currentTileUrl++;
+                        if (currentTileUrl < tileUrls.length) {
+                            tryGoongTile();
+                        } else {
+                            console.log('All Goong URLs failed, keeping OpenStreetMap');
+                        }
+                    }
+                });
+                
+                // Add Goong layer vào map để test (sẽ được remove nếu không thành công)
+                // OSM layer sẽ ở dưới, Goong layer ở trên
+                goongLayer.addTo(map);
+                
+                // Sau 5 giây, kiểm tra xem Goong tiles có load được không
+                setTimeout(function() {
+                    if (successTiles < 3 && goongLayer && map.hasLayer(goongLayer)) {
+                        // Goong tiles không load được, remove Goong layer và giữ OSM
+                        console.log('Goong tiles not loading (' + successTiles + ' successful), removing Goong layer, keeping OSM');
+                        map.removeLayer(goongLayer);
+                    } else if (successTiles >= 3 && osmLayer && map.hasLayer(osmLayer)) {
+                        // Goong tiles đã load thành công, remove OSM
+                        console.log('Goong tiles loaded successfully (' + successTiles + ' tiles), removing OSM');
+                        map.removeLayer(osmLayer);
+                    }
+                }, 5000);
+            }
+            
+            tryGoongTile();
+        }
+        
+        // Bắt đầu load Leaflet ngay
+        loadLeaflet();
+        
+        // Hàm để cập nhật API key từ Android
+        window.setGoongAPIKey = function(key) {
+            window.GoongAPIKey = key;
+            console.log('API key received from Android: ' + (key ? key.substring(0, 10) + '...' : 'null'));
+            // Nếu đang dùng Leaflet
+            if (useLeaflet && key) {
+                if (typeof L !== 'undefined') {
+                    if (!map) {
+                        // Map chưa được khởi tạo, khởi tạo ngay
+                        console.log('Initializing Leaflet map with API key...');
+                        initLeafletMap();
+                    } else {
+                        // Map đã được khởi tạo, chỉ thử load Goong tiles nếu chưa có
+                        // KHÔNG remove OSM layer - chỉ thử thêm Goong layer
+                        console.log('Map already initialized, trying to add Goong tiles if available...');
+                        // Kiểm tra xem đã có Goong layer chưa
+                        var hasGoongLayer = false;
+                        map.eachLayer(function(layer) {
+                            if (layer instanceof L.TileLayer && layer._url && layer._url.indexOf('goong.io') !== -1) {
+                                hasGoongLayer = true;
+                            }
+                        });
+                        
+                        // Nếu chưa có Goong layer, thử load (nhưng giữ OSM)
+                        if (!hasGoongLayer) {
+                            // Tìm OSM layer để truyền vào tryLoadGoongTiles
+                            var osmLayer = null;
+                            map.eachLayer(function(layer) {
+                                if (layer instanceof L.TileLayer && layer._url && layer._url.indexOf('openstreetmap') !== -1) {
+                                    osmLayer = layer;
+                                }
+                            });
+                            if (osmLayer) {
+                                tryLoadGoongTiles(key, osmLayer);
+                            }
+                        }
+                    }
+                } else {
+                    console.log('Waiting for Leaflet to load...');
+                }
+            }
+        };
+        
+        var markers = [];
+        var userMarker = null;
+        var routePolyline = null;
+        
+        // Hàm để thêm marker chi nhánh
+        window.addBranchMarker = function(lat, lng, title, address, type) {
+            if (!map) {
+                console.error('Map not initialized');
+                return;
+            }
+            
+            if (useLeaflet) {
+                // Sử dụng Leaflet
+                var color = type === 'atm' ? '#FF9800' : '#F44336';
+                var marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup('<b>' + title + '</b><br>' + address);
+                markers.push(marker);
+                return marker;
+            } else {
+                // Sử dụng Goong Maps
+                var color = type === 'atm' ? '#FF9800' : '#F44336';
+                var el = document.createElement('div');
+                el.className = 'marker';
+                el.style.width = '30px';
+                el.style.height = '30px';
+                el.style.borderRadius = '50%';
+                el.style.backgroundColor = color;
+                el.style.border = '3px solid white';
+                el.style.cursor = 'pointer';
+                
+                var MarkerClass = goongjs ? goongjs.Marker : goong.Marker;
+                var PopupClass = goongjs ? goongjs.Popup : goong.Popup;
+                
+                var marker = new MarkerClass({
+                    element: el,
+                    anchor: 'bottom'
+                })
+                .setLngLat([lng, lat])
+                .setPopup(new PopupClass().setHTML('<b>' + title + '</b><br>' + address))
+                .addTo(map);
+                
+                markers.push(marker);
+                return marker;
+            }
+        };
+        
+        // Hàm để thêm marker vị trí người dùng
+        window.addUserMarker = function(lat, lng) {
+            if (!map) {
+                console.error('Map not initialized');
+                return;
+            }
+            if (userMarker) {
+                if (useLeaflet) {
+                    map.removeLayer(userMarker);
+                } else {
+                    userMarker.remove();
+                }
+            }
+            
+            if (useLeaflet) {
+                userMarker = L.marker([lat, lng]).addTo(map);
+                map.setView([lat, lng], 13);
+            } else {
+                var el = document.createElement('div');
+                el.className = 'marker';
+                el.style.width = '20px';
+                el.style.height = '20px';
+                el.style.borderRadius = '50%';
+                el.style.backgroundColor = '#2196F3';
+                el.style.border = '3px solid white';
+                
+                var MarkerClass = goongjs ? goongjs.Marker : goong.Marker;
+                userMarker = new MarkerClass({
+                    element: el,
+                    anchor: 'center'
+                })
+                .setLngLat([lng, lat])
+                .addTo(map);
+                
+                map.flyTo({
+                    center: [lng, lat],
+                    zoom: 13
+                });
+            }
+        };
+        
+        // Hàm để vẽ route (đường thẳng)
+        window.drawRoute = function(userLat, userLng, branchLat, branchLng) {
+            if (!map) {
+                console.error('Map not initialized');
+                return;
+            }
+            if (routePolyline) {
+                if (useLeaflet) {
+                    map.removeLayer(routePolyline);
+                } else {
+                    routePolyline.remove();
+                }
+            }
+            
+            if (useLeaflet) {
+                var polyline = L.polyline([[userLat, userLng], [branchLat, branchLng]], {
+                    color: '#4CAF50',
+                    weight: 4
+                }).addTo(map);
+                routePolyline = polyline;
+                map.fitBounds([[userLat, userLng], [branchLat, branchLng]], { padding: [50, 50] });
+            } else {
+                var coordinates = [
+                    [userLng, userLat],
+                    [branchLng, branchLat]
+                ];
+                
+                var PolylineClass = goongjs ? goongjs.Polyline : goong.Polyline;
+                var LngLatBoundsClass = goongjs ? goongjs.LngLatBounds : goong.LngLatBounds;
+                
+                routePolyline = new PolylineClass({
+                    coordinates: coordinates,
+                    color: '#4CAF50',
+                    width: 4
+                });
+                routePolyline.addTo(map);
+                
+                // Fit map to show both points
+                var bounds = new LngLatBoundsClass();
+                bounds.extend([userLng, userLat]);
+                bounds.extend([branchLng, branchLat]);
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        };
+        
+        // Hàm để vẽ route đi bộ từ Goong Directions API
+        window.drawWalkingRoute = function(coordinates, distance, duration) {
+            if (!map) {
+                console.error('Map not initialized');
+                return;
+            }
+            
+            // Xóa route cũ
+            if (routePolyline) {
+                if (useLeaflet) {
+                    map.removeLayer(routePolyline);
+                } else {
+                    routePolyline.remove();
+                }
+            }
+            
+            if (useLeaflet) {
+                // Vẽ polyline với nhiều điểm từ Directions API
+                var polyline = L.polyline(coordinates, {
+                    color: '#2196F3',
+                    weight: 5,
+                    opacity: 0.8
+                }).addTo(map);
+                routePolyline = polyline;
+                
+                // Fit map to show entire route
+                var bounds = L.latLngBounds(coordinates);
+                map.fitBounds(bounds, { padding: [50, 50] });
+                
+                console.log('Walking route drawn: ' + coordinates.length + ' points, distance: ' + distance + 'm, duration: ' + duration + 's');
+            } else {
+                // Goong Maps JS
+                var lngLatCoords = coordinates.map(function(coord) {
+                    return [coord[1], coord[0]]; // Convert [lat, lng] to [lng, lat]
+                });
+                
+                var PolylineClass = goongjs ? goongjs.Polyline : goong.Polyline;
+                var LngLatBoundsClass = goongjs ? goongjs.LngLatBounds : goong.LngLatBounds;
+                
+                routePolyline = new PolylineClass({
+                    coordinates: lngLatCoords,
+                    color: '#2196F3',
+                    width: 5
+                });
+                routePolyline.addTo(map);
+                
+                // Fit map to show entire route
+                var bounds = new LngLatBoundsClass();
+                lngLatCoords.forEach(function(coord) {
+                    bounds.extend(coord);
+                });
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        };
+        
+        // Hàm để di chuyển camera đến vị trí
+        window.moveToLocation = function(lat, lng, zoom) {
+            if (!map) {
+                console.error('Map not initialized');
+                return;
+            }
+            if (useLeaflet) {
+                map.setView([lat, lng], zoom || 15);
+            } else {
+                map.flyTo({
+                    center: [lng, lat],
+                    zoom: zoom || 15
+                });
+            }
+        };
+        
+        // Hàm để xóa tất cả markers
+        window.clearMarkers = function() {
+            if (!map) return;
+            markers.forEach(function(marker) {
+                if (useLeaflet) {
+                    map.removeLayer(marker);
+                } else {
+                    marker.remove();
+                }
+            });
+            markers = [];
+        };
+        
+        // Các hàm này sẽ được gọi sau khi map đã được khởi tạo
+    </script>
+</body>
+</html>
+

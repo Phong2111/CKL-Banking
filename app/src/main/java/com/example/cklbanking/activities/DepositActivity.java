@@ -13,16 +13,19 @@ import androidx.appcompat.widget.Toolbar;
 
 import com.example.cklbanking.R;
 import com.example.cklbanking.models.Account;
+import com.example.cklbanking.models.Transaction;
+import com.example.cklbanking.repositories.AccountRepository;
+import com.example.cklbanking.repositories.TransactionRepository;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class DepositActivity extends AppCompatActivity {
 
@@ -32,11 +35,15 @@ public class DepositActivity extends AppCompatActivity {
     private RadioGroup radioGroupMethod;
     private MaterialButton btnDeposit;
     private MaterialButton btn100k, btn500k, btn1m, btn2m, btn5m, btn10m;
+    private CircularProgressIndicator progressBar;
     
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
+    private AccountRepository accountRepository;
+    private TransactionRepository transactionRepository;
     private List<Account> accounts;
     private String selectedAccountId;
+    private Account selectedAccount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,11 +52,20 @@ public class DepositActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        accountRepository = new AccountRepository();
+        transactionRepository = new TransactionRepository();
 
         initViews();
         setupToolbar();
         setupListeners();
-        loadAccounts();
+        
+        // Kiểm tra xem có account_id từ intent không (nếu được gọi từ AccountDetailActivity)
+        String accountIdFromIntent = getIntent().getStringExtra("account_id");
+        if (accountIdFromIntent != null) {
+            loadSpecificAccount(accountIdFromIntent);
+        } else {
+            loadAccounts();
+        }
     }
 
     private void initViews() {
@@ -65,6 +81,28 @@ public class DepositActivity extends AppCompatActivity {
         btn2m = findViewById(R.id.btn2m);
         btn5m = findViewById(R.id.btn5m);
         btn10m = findViewById(R.id.btn10m);
+        progressBar = findViewById(R.id.progressBar);
+    }
+    
+    private void loadSpecificAccount(String accountId) {
+        accountRepository.getAccountById(accountId)
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        selectedAccount = documentSnapshot.toObject(Account.class);
+                        if (selectedAccount != null) {
+                            selectedAccount.setAccountId(documentSnapshot.getId());
+                            selectedAccountId = accountId;
+                            // Ẩn spinner và hiển thị thông tin account
+                            spinnerAccount.setVisibility(View.GONE);
+                            // Có thể hiển thị thông tin account ở đây nếu cần
+                        }
+                    } else {
+                        loadAccounts(); // Fallback to load all accounts
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    loadAccounts(); // Fallback to load all accounts
+                });
     }
 
     private void setupToolbar() {
@@ -89,8 +127,7 @@ public class DepositActivity extends AppCompatActivity {
     private void loadAccounts() {
         String userId = mAuth.getCurrentUser().getUid();
         
-        db.collection("accounts")
-                .whereEqualTo("userId", userId)
+        accountRepository.getAccountsForUser(userId)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     accounts = new ArrayList<>();
@@ -98,6 +135,7 @@ public class DepositActivity extends AppCompatActivity {
                     
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Account account = document.toObject(Account.class);
+                        account.setAccountId(document.getId());
                         accounts.add(account);
                         accountNames.add(account.getAccountNumber() + " - " + account.getAccountType());
                     }
@@ -106,6 +144,10 @@ public class DepositActivity extends AppCompatActivity {
                             android.R.layout.simple_spinner_item, accountNames);
                     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                     spinnerAccount.setAdapter(adapter);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Lỗi tải danh sách tài khoản: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -117,39 +159,88 @@ public class DepositActivity extends AppCompatActivity {
             return;
         }
         
-        double amount = Double.parseDouble(amountStr);
+        double amount;
+        try {
+            amount = Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            editAmount.setError("Số tiền không hợp lệ");
+            return;
+        }
         
         if (amount < 10000) {
             editAmount.setError("Số tiền tối thiểu là 10.000 VNĐ");
             return;
         }
         
-        int selectedPos = spinnerAccount.getSelectedItemPosition();
-        if (selectedPos < 0 || accounts.isEmpty()) {
-            Toast.makeText(this, "Vui lòng chọn tài khoản", Toast.LENGTH_SHORT).show();
+        if (amount > 100000000) {
+            editAmount.setError("Số tiền tối đa là 100.000.000 VNĐ");
             return;
         }
         
-        selectedAccountId = accounts.get(selectedPos).getAccountId();
+        // Lấy account được chọn
+        if (selectedAccountId == null) {
+            int selectedPos = spinnerAccount.getSelectedItemPosition();
+            if (selectedPos < 0 || accounts == null || accounts.isEmpty()) {
+                Toast.makeText(this, "Vui lòng chọn tài khoản", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            selectedAccount = accounts.get(selectedPos);
+            selectedAccountId = selectedAccount.getAccountId();
+        }
         
-        // Create deposit request
-        Map<String, Object> depositRequest = new HashMap<>();
-        depositRequest.put("accountId", selectedAccountId);
-        depositRequest.put("amount", amount);
-        depositRequest.put("method", getSelectedMethod());
-        depositRequest.put("status", "pending");
-        depositRequest.put("timestamp", System.currentTimeMillis());
-        depositRequest.put("userId", mAuth.getCurrentUser().getUid());
+        if (selectedAccount == null) {
+            // Load account info
+            accountRepository.getAccountById(selectedAccountId)
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            selectedAccount = documentSnapshot.toObject(Account.class);
+                            if (selectedAccount != null) {
+                                selectedAccount.setAccountId(documentSnapshot.getId());
+                                performDeposit(amount);
+                            }
+                        }
+                    });
+            return;
+        }
+        
+        performDeposit(amount);
+    }
+    
+    private void performDeposit(double amount) {
+        // Tính số dư mới
+        double newBalance = selectedAccount.getBalance() + amount;
+        
+        // Tạo transaction
+        Transaction transaction = new Transaction();
+        transaction.setFromAccountId(selectedAccountId);
+        transaction.setToAccountId(selectedAccountId); // Deposit vào chính account đó
+        transaction.setAmount(amount);
+        transaction.setType("deposit");
+        transaction.setStatus("completed");
         
         btnDeposit.setEnabled(false);
+        progressBar.setVisibility(View.VISIBLE);
         
-        db.collection("deposit_requests")
-                .add(depositRequest)
-                .addOnSuccessListener(documentReference -> {
-                    Toast.makeText(this, "Yêu cầu nạp tiền đã được gửi!", Toast.LENGTH_SHORT).show();
+        // Sử dụng batch write để đảm bảo atomicity
+        WriteBatch batch = db.batch();
+        
+        // Update balance
+        batch.update(db.collection("accounts").document(selectedAccountId), "balance", newBalance);
+        
+        // Create transaction (sẽ được thêm vào batch sau)
+        String transactionId = db.collection("transactions").document().getId();
+        transaction.setTransactionId(transactionId);
+        batch.set(db.collection("transactions").document(transactionId), transaction);
+        
+        // Commit batch
+        batch.commit()
+                .addOnSuccessListener(aVoid -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(this, "Nạp tiền thành công!", Toast.LENGTH_SHORT).show();
                     finish();
                 })
                 .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
                     btnDeposit.setEnabled(true);
                     Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });

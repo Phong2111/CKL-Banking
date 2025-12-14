@@ -11,14 +11,19 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.cklbanking.R;
+import com.example.cklbanking.services.OTPService;
+import com.example.cklbanking.services.PaymentService;
+import com.example.cklbanking.services.TransactionService;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.Locale;
+import java.util.Map;
 
 public class OTPVerificationActivity extends AppCompatActivity {
 
@@ -33,10 +38,22 @@ public class OTPVerificationActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
 
+    // Services
+    private OTPService otpService;
+    private PaymentService paymentService;
+    private TransactionService transactionService;
+
     // Data
     private String transactionId;
+    private String userId;
     private double amount;
     private String recipient;
+    private String userEmail;
+    private String transferType;
+    private String fromAccountId;
+    private String toAccountId;
+    private String recipientBank;
+    private String description;
     private CountDownTimer countDownTimer;
     private long timeLeftInMillis = 120000; // 2 minutes
 
@@ -48,11 +65,22 @@ public class OTPVerificationActivity extends AppCompatActivity {
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        otpService = new OTPService();
+        paymentService = new PaymentService();
+        transactionService = new TransactionService();
 
         // Get intent data
         transactionId = getIntent().getStringExtra("transaction_id");
         amount = getIntent().getDoubleExtra("amount", 0);
         recipient = getIntent().getStringExtra("recipient");
+        transferType = getIntent().getStringExtra("transfer_type");
+        userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+        
+        // Load transaction details
+        loadTransactionDetails();
+
+        // Load user email
+        loadUserEmail();
 
         // Initialize Views
         initViews();
@@ -68,6 +96,12 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         // Start timer
         startTimer();
+        
+        // Load OTP for testing (hiển thị OTP ngay trong app)
+        loadOTPForTesting();
+        
+        // Kiểm tra trạng thái email
+        checkEmailStatus();
     }
 
     private void initViews() {
@@ -142,6 +176,139 @@ public class OTPVerificationActivity extends AppCompatActivity {
         otpTimer.setText(timeFormatted);
     }
 
+    private void loadUserEmail() {
+        if (userId == null) return;
+
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        userEmail = documentSnapshot.getString("email");
+                        // Fallback to Firebase Auth email
+                        if (userEmail == null || userEmail.isEmpty()) {
+                            userEmail = mAuth.getCurrentUser() != null ? 
+                                mAuth.getCurrentUser().getEmail() : null;
+                        }
+                    } else {
+                        // Fallback to Firebase Auth email
+                        userEmail = mAuth.getCurrentUser() != null ? 
+                            mAuth.getCurrentUser().getEmail() : null;
+                    }
+                    
+                    // Update OTP message with email
+                    if (userEmail != null && !userEmail.isEmpty()) {
+                        TextView otpMessage = findViewById(R.id.otpMessage);
+                        if (otpMessage != null) {
+                            // Mask email for privacy
+                            String maskedEmail = maskEmail(userEmail);
+                            otpMessage.setText("Mã OTP đã được gửi đến email\n" + maskedEmail);
+                        }
+                    }
+                });
+    }
+    
+    private String maskEmail(String email) {
+        if (email == null || email.isEmpty()) return "***";
+        int atIndex = email.indexOf("@");
+        if (atIndex <= 0) return "***";
+        
+        String localPart = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+        
+        if (localPart.length() <= 2) {
+            return "***" + domain;
+        }
+        
+        String masked = localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1);
+        return masked + domain;
+    }
+    
+    // CHỈ DÙNG CHO TEST - XÓA TRONG PRODUCTION
+    private void loadOTPForTesting() {
+        if (transactionId == null) return;
+        
+        // Đợi 1 giây để OTP được tạo xong
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            db.collection("otps")
+                    .document(transactionId)
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            String otpCode = documentSnapshot.getString("otpCode");
+                            String status = documentSnapshot.getString("status");
+                            
+                            android.util.Log.d("OTPVerification", "===========================================");
+                            android.util.Log.d("OTPVerification", "OTP CODE FOR TESTING: " + otpCode);
+                            android.util.Log.d("OTPVerification", "OTP Status: " + status);
+                            android.util.Log.d("OTPVerification", "===========================================");
+                            
+                            // Hiển thị OTP trong AlertDialog (CHỈ CHO DEVELOPMENT)
+                            if (otpCode != null) {
+                                showOTPDialog(otpCode, status);
+                            }
+                        } else {
+                            // Nếu chưa có OTP, thử lại sau 2 giây
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                loadOTPForTesting();
+                            }, 2000);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("OTPVerification", "Error loading OTP", e);
+                    });
+        }, 1000);
+    }
+    
+    private void showOTPDialog(String otpCode, String status) {
+        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
+        builder.setTitle("🔐 Mã OTP (Chế độ Test)");
+        builder.setMessage(
+            "Mã OTP của bạn là:\n\n" +
+            "━━━━━━━━━━━━━━━━━━━━\n" +
+            "      " + otpCode + "\n" +
+            "━━━━━━━━━━━━━━━━━━━━\n\n" +
+            "Trạng thái email: " + (status != null ? status : "pending") + "\n\n" +
+            "⚠️ Lưu ý: Đây là chế độ test.\n" +
+            "Trong production, mã OTP sẽ được gửi qua email."
+        );
+        builder.setPositiveButton("Đã hiểu", (dialog, which) -> dialog.dismiss());
+        builder.setCancelable(false);
+        builder.show();
+    }
+    
+    private void checkEmailStatus() {
+        if (transactionId == null) return;
+        
+        // Kiểm tra trạng thái email request
+        db.collection("email_requests")
+                .document(transactionId)
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) {
+                        android.util.Log.e("OTPVerification", "Error listening to email status", e);
+                        return;
+                    }
+                    
+                    if (snapshot != null && snapshot.exists()) {
+                        String status = snapshot.getString("status");
+                        String error = snapshot.getString("error");
+                        
+                        if ("sent".equals(status)) {
+                            android.util.Log.d("OTPVerification", "✅ Email đã được gửi thành công");
+                        } else if ("failed".equals(status)) {
+                            android.util.Log.e("OTPVerification", "❌ Email gửi thất bại: " + error);
+                            runOnUiThread(() -> {
+                                Toast.makeText(this, 
+                                    "Email gửi thất bại. Vui lòng kiểm tra OTP trong dialog hoặc Logcat.", 
+                                    Toast.LENGTH_LONG).show();
+                            });
+                        } else {
+                            android.util.Log.d("OTPVerification", "⏳ Email đang được xử lý...");
+                        }
+                    }
+                });
+    }
+
     private void verifyOTP() {
         String otpCode = getOTPCode();
         
@@ -150,48 +317,144 @@ public class OTPVerificationActivity extends AppCompatActivity {
             return;
         }
 
-        showLoading(true);
-
-        // TODO: Verify OTP with backend
-        // For now, accept any 6-digit code
-        new android.os.Handler().postDelayed(() -> {
-            showLoading(false);
-            
-            if (otpCode.equals("123456") || otpCode.length() == 6) {
-                // OTP correct
-                updateTransactionStatus("completed");
-            } else {
-                Toast.makeText(this, "Mã OTP không đúng", Toast.LENGTH_SHORT).show();
-            }
-        }, 1500);
-    }
-
-    private void updateTransactionStatus(String status) {
         if (transactionId == null) {
-            Toast.makeText(this, "Giao dịch thành công!", Toast.LENGTH_SHORT).show();
-            finish();
+            Toast.makeText(this, "Lỗi: Không tìm thấy thông tin giao dịch", 
+                Toast.LENGTH_SHORT).show();
             return;
         }
 
+        showLoading(true);
+
+        // Verify OTP using OTPService
+        otpService.verifyOTP(transactionId, otpCode, new OTPService.OTPVerificationCallback() {
+            @Override
+            public void onVerificationResult(boolean success, String message) {
+                runOnUiThread(() -> {
+            showLoading(false);
+            
+                    if (success) {
+                        // OTP verified, now process payment and persist transaction
+                        processTransactionAfterOTP();
+            } else {
+                        Toast.makeText(OTPVerificationActivity.this, message, 
+                            Toast.LENGTH_SHORT).show();
+            }
+                });
+            }
+        });
+    }
+
+    private void loadTransactionDetails() {
+        if (transactionId == null) return;
+
         db.collection("transactions")
                 .document(transactionId)
-                .update("status", status)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Giao dịch thành công!", Toast.LENGTH_SHORT).show();
-                    finish();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        fromAccountId = documentSnapshot.getString("fromAccountId");
+                        toAccountId = documentSnapshot.getString("toAccountId");
+                        transferType = documentSnapshot.getString("transferType");
+                        recipientBank = documentSnapshot.getString("recipientBank");
+                        description = documentSnapshot.getString("description");
+                    }
                 });
+    }
+    
+    private void processTransactionAfterOTP() {
+        showLoading(true);
+        
+        // For external transfers, process payment first
+        if ("external".equals(transferType) && recipientBank != null) {
+            // Process payment via payment gateway
+            paymentService.processPayment(transactionId, amount, 
+                PaymentService.VNPAY_PAYMENT_METHOD, recipientBank,
+                new PaymentService.PaymentCallback() {
+                    @Override
+                    public void onPaymentResult(boolean success, String message, 
+                                              Map<String, Object> paymentData) {
+                        runOnUiThread(() -> {
+                            if (!success) {
+                                showLoading(false);
+                                Toast.makeText(OTPVerificationActivity.this, 
+                                    "Lỗi thanh toán: " + message, Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            
+                            // Payment successful, now persist transaction
+                            persistTransaction();
+                        });
+                    }
+                });
+        } else {
+            // Internal transfer - no payment needed, just persist
+            persistTransaction();
+        }
+    }
+    
+    private void persistTransaction() {
+        // Use TransactionService to persist transaction and update balances
+        transactionService.persistTransaction(
+            transactionId,
+            fromAccountId,
+            toAccountId,
+            amount,
+            "transfer",
+            transferType != null ? transferType : "internal",
+            recipient != null ? recipient : "Unknown",
+            description != null ? description : "",
+            recipientBank,
+            new TransactionService.TransactionPersistenceCallback() {
+                @Override
+                public void onPersistenceResult(boolean success, String message) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        
+                        if (success) {
+                            Toast.makeText(OTPVerificationActivity.this, 
+                                "Giao dịch thành công!", Toast.LENGTH_SHORT).show();
+                            finish();
+                        } else {
+                            Toast.makeText(OTPVerificationActivity.this, 
+                                "Lỗi: " + message, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        );
     }
 
     private void resendOTP() {
-        // TODO: Request new OTP from backend
+        if (transactionId == null || userId == null) {
+            Toast.makeText(this, "Lỗi: Không tìm thấy thông tin giao dịch", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (userEmail == null || userEmail.isEmpty()) {
+            Toast.makeText(this, "Không tìm thấy email. Vui lòng cập nhật email trong hồ sơ.", 
+                Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        showLoading(true);
+        btnResendOtp.setEnabled(false);
+
+        // Resend OTP using OTPService (via email)
+        String newOTP = otpService.resendOTP(transactionId, userId, userEmail);
+        
+        // Reset timer
         timeLeftInMillis = 120000;
+        if (countDownTimer != null) {
+            countDownTimer.cancel();
+        }
         startTimer();
+        
         btnResendOtp.setEnabled(false);
         btnVerifyOtp.setEnabled(true);
         clearOTP();
+        
+        showLoading(false);
         Toast.makeText(this, "Đã gửi lại mã OTP", Toast.LENGTH_SHORT).show();
     }
 

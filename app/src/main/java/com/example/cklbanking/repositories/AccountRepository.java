@@ -2,6 +2,7 @@ package com.example.cklbanking.repositories;
 
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.example.cklbanking.models.Account; // Import model Account
@@ -27,5 +28,30 @@ public class AccountRepository {
     // Dùng cho TV2 (Khách hàng) xem danh sách tài khoản
     public Query getAccountsForUser(String uid) {
         return accountCollection.whereEqualTo("userId", uid);
+    }
+
+    // Lấy account theo ID
+    public Task<DocumentSnapshot> getAccountById(String accountId) {
+        return accountCollection.document(accountId).get();
+    }
+
+    // Cập nhật số dư tài khoản
+    public Task<Void> updateBalance(String accountId, double newBalance) {
+        return accountCollection.document(accountId).update("balance", newBalance);
+    }
+
+    // Cập nhật lãi suất (dành cho banking officer)
+    public Task<Void> updateInterestRate(String accountId, double newInterestRate) {
+        return accountCollection.document(accountId).update("interestRate", newInterestRate);
+    }
+
+    // Cập nhật thông tin account (generic update)
+    public Task<Void> updateAccount(String accountId, Account account) {
+        return accountCollection.document(accountId).set(account);
+    }
+
+    // Lấy tất cả saving accounts (để officer quản lý interest rates)
+    public Query getAllSavingAccounts() {
+        return accountCollection.whereEqualTo("accountType", "saving");
     }
 }
