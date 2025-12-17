@@ -1,1 +1,27 @@
+version: '3.8'
 
+services:
+  firebase-emulator:
+    image: ghcr.io/firebase/firebase-tools:latest
+    container_name: ckl-banking-emulator
+    ports:
+      - "4000:4000"   # Emulator UI
+      - "8080:8080"   # Firestore
+      - "5001:5001"   # Functions
+      - "9099:9099"   # Authentication
+      - "9000:9000"   # Storage
+    volumes:
+      - ./firebase.json:/firebase.json
+      - ./firebase-debug.log:/firebase-debug.log
+      - ./emulator-data:/root/.cache/firebase/emulators
+      - ./functions:/functions
+    working_dir: /workspace
+    command: emulators:start --project=ckl-banking-demo
+    environment:
+      - FIREBASE_CONFIG=/firebase.json
+    networks:
+      - firebase-network
+
+networks:
+  firebase-network:
+    driver: bridge
