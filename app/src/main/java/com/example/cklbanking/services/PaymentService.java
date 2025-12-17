@@ -9,7 +9,6 @@ import java.util.Map;
 public class PaymentService {
     private static final String TAG = "PaymentService";
     public static final String VNPAY_PAYMENT_METHOD = "vnpay";
-    public static final String STRIPE_PAYMENT_METHOD = "stripe";
     
     private FirebaseFirestore db;
     
@@ -54,9 +53,8 @@ public class PaymentService {
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Payment request created for transaction: " + transactionId);
                     
-                    // For now, simulate payment processing
-                    // In production, this should be handled by Cloud Function
-                    // which calls VNPay/Stripe API
+        // In production, this should be handled by Cloud Function
+        // which calls VNPay API
                     processPaymentGateway(transactionId, amount, paymentMethod, recipientBank, callback);
                 })
                 .addOnFailureListener(e -> {
@@ -66,7 +64,7 @@ public class PaymentService {
     }
     
     /**
-     * Process payment through payment gateway (VNPay or Stripe)
+     * Process payment through payment gateway (VNPay)
      * In production, this should be done via Cloud Function
      */
     private void processPaymentGateway(String transactionId, double amount, String paymentMethod,
@@ -74,10 +72,8 @@ public class PaymentService {
         
         if (VNPAY_PAYMENT_METHOD.equals(paymentMethod)) {
             processVNPayPayment(transactionId, amount, recipientBank, callback);
-        } else if (STRIPE_PAYMENT_METHOD.equals(paymentMethod)) {
-            processStripePayment(transactionId, amount, recipientBank, callback);
         } else {
-            callback.onPaymentResult(false, "Phương thức thanh toán không được hỗ trợ", null);
+            callback.onPaymentResult(false, "Phương thức thanh toán không được hỗ trợ. Chỉ hỗ trợ VNPay.", null);
         }
     }
     
@@ -129,40 +125,6 @@ public class PaymentService {
                     Log.e(TAG, "Failed to create VNPay payment request", e);
                     callback.onPaymentResult(false, 
                         "Lỗi tạo yêu cầu thanh toán VNPay: " + e.getMessage(), null);
-                });
-    }
-    
-    /**
-     * Process Stripe payment
-     * Note: This is a placeholder. In production, use Stripe SDK or API
-     */
-    private void processStripePayment(String transactionId, double amount, String recipientBank,
-                                     PaymentCallback callback) {
-        // TODO: Integrate with Stripe API
-        // For now, simulate successful payment
-        Log.d(TAG, "Processing Stripe payment for transaction: " + transactionId);
-        
-        // Update payment request status
-        Map<String, Object> update = new HashMap<>();
-        update.put("status", "completed");
-        update.put("completedAt", com.google.firebase.Timestamp.now());
-        update.put("paymentGateway", "Stripe");
-        update.put("paymentReference", "STRIPE_" + System.currentTimeMillis());
-        
-        db.collection("payment_requests")
-                .document(transactionId)
-                .update(update)
-                .addOnSuccessListener(aVoid -> {
-                    Map<String, Object> paymentData = new HashMap<>();
-                    paymentData.put("paymentMethod", STRIPE_PAYMENT_METHOD);
-                    paymentData.put("paymentReference", update.get("paymentReference"));
-                    paymentData.put("gateway", "Stripe");
-                    
-                    callback.onPaymentResult(true, "Thanh toán Stripe thành công", paymentData);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to update Stripe payment status", e);
-                    callback.onPaymentResult(false, "Lỗi cập nhật trạng thái thanh toán", null);
                 });
     }
     

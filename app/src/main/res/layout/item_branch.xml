@@ -89,8 +89,33 @@
                     android:text="Chi nhánh"
                     android:textColor="@color/text_hint"
                     android:textSize="12sp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" • "
+                    style="@style/TextCaption"/>
+
+                <TextView
+                    android:id="@+id/branchStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Đang mở"
+                    android:textSize="12sp"
+                    android:textStyle="bold"/>
             </LinearLayout>
         </LinearLayout>
+
+        <!-- Favorite Icon (if favorite) -->
+        <ImageView
+            android:id="@+id/iconFavorite"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_vertical"
+            android:src="@drawable/ic_favorite"
+            app:tint="@color/warning"
+            android:visibility="gone"
+            android:layout_marginEnd="8dp"/>
 
         <!-- Arrow Icon -->
         <ImageView
@@ -101,6 +126,13 @@
             app:tint="@color/text_hint"/>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
+
+
+
+
+
+
+
 
 
 

@@ -54,7 +54,23 @@
             android:visibility="gone"/>
 
     </LinearLayout>
+
+    <!-- Update All Button -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/btnUpdateAll"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:text="Cập nhật tất cả"
+        app:iconTint="@color/white"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+
+
+
+
+
 
 
 

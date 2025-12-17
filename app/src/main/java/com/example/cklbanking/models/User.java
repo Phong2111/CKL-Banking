@@ -11,6 +11,8 @@ public class User {
     private String role; // 'customer' hoặc 'officer'
     private String ekycStatus; // 'pending', 'verified', 'failed'
     private String faceImageUrl;
+    private Date lockedUntil; // Thời gian khóa tài khoản (null nếu không bị khóa)
+    private Integer failedAttempts; // Số lần nhập sai OTP (reset về 0 sau khi đúng)
 
     @ServerTimestamp // Tự động lấy giờ server khi tạo
     private Date createdAt;
@@ -53,4 +55,10 @@ public class User {
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
+    public Date getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(Date lockedUntil) { this.lockedUntil = lockedUntil; }
+
+    public Integer getFailedAttempts() { return failedAttempts != null ? failedAttempts : 0; }
+    public void setFailedAttempts(Integer failedAttempts) { this.failedAttempts = failedAttempts; }
 }

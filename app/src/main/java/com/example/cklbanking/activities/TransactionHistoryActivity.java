@@ -5,6 +5,7 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -13,6 +14,7 @@ import com.example.cklbanking.R;
 import com.example.cklbanking.adapters.TransactionAdapter;
 import com.example.cklbanking.models.Transaction;
 import com.example.cklbanking.repositories.TransactionRepository;
+import com.example.cklbanking.utils.ErrorHandler;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -36,6 +38,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     private RecyclerView transactionRecyclerView;
     private View emptyStateLayout;
     private CircularProgressIndicator progressBar;
+    private View loadingMoreLayout;
 
     // Firebase
     private FirebaseAuth mAuth;
@@ -48,6 +51,12 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     private List<Transaction> filteredTransactions;
     private TransactionAdapter adapter;
     private String currentFilter = "all";
+    
+    // Pagination
+    private static final int PAGE_SIZE = 20;
+    private com.google.firebase.firestore.QueryDocumentSnapshot lastDocument;
+    private boolean isLoading = false;
+    private boolean hasMoreData = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,6 +99,7 @@ public class TransactionHistoryActivity extends AppCompatActivity {
         transactionRecyclerView = findViewById(R.id.transactionRecyclerView);
         emptyStateLayout = findViewById(R.id.emptyStateLayout);
         progressBar = findViewById(R.id.progressBar);
+        loadingMoreLayout = findViewById(R.id.loadingMoreLayout);
     }
 
     private void setupToolbar() {
@@ -104,8 +114,28 @@ public class TransactionHistoryActivity extends AppCompatActivity {
         allTransactions = new ArrayList<>();
         filteredTransactions = new ArrayList<>();
         adapter = new TransactionAdapter(this, filteredTransactions);
-        transactionRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        transactionRecyclerView.setLayoutManager(layoutManager);
         transactionRecyclerView.setAdapter(adapter);
+        
+        // Add scroll listener for pagination
+        transactionRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                
+                int visibleItemCount = layoutManager.getChildCount();
+                int totalItemCount = layoutManager.getItemCount();
+                int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+                
+                // Load more when user scrolls near the end
+                if (!isLoading && hasMoreData) {
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5) {
+                        loadMoreTransactions();
+                    }
+                }
+            }
+        });
     }
 
     private void setupListeners() {
@@ -132,47 +162,55 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     }
 
     private void loadTransactions() {
+        if (isLoading) return;
+        
         showLoading(true);
+        isLoading = true;
+        allTransactions.clear();
+        lastDocument = null;
+        hasMoreData = true;
 
         // Query transactions using TransactionRepository
         Query query;
         if (accountId != null) {
             // Load transactions for specific account
-            query = transactionRepository.getTransactionsByAccount(accountId);
+            query = transactionRepository.getTransactionsByAccount(accountId)
+                    .limit(PAGE_SIZE);
         } else {
             // Load all transactions for current user
             String userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
             if (userId != null) {
-                // Get all accounts for user, then get transactions for each
-                // For simplicity, we'll query all transactions and filter by userId later
-                // Or we can get all user's accounts first
                 query = db.collection("transactions")
-                        .orderBy("timestamp", Query.Direction.DESCENDING);
+                        .whereEqualTo("userId", userId)
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .limit(PAGE_SIZE);
             } else {
                 query = db.collection("transactions")
-                        .orderBy("timestamp", Query.Direction.DESCENDING);
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .limit(PAGE_SIZE);
             }
         }
 
         query.get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     showLoading(false);
-                    allTransactions.clear();
+                    isLoading = false;
                     
                     String userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
                     
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Transaction transaction = document.toObject(Transaction.class);
                         transaction.setTransactionId(document.getId());
-                        
-                        // If no accountId filter, only show transactions related to user's accounts
-                        if (accountId == null && userId != null) {
-                            // Check if transaction is from or to user's account
-                            // We need to check if fromAccountId or toAccountId belongs to user
-                            // For now, we'll show all transactions - can be improved later
-                        }
-                        
                         allTransactions.add(transaction);
+                    }
+                    
+                    // Update last document for pagination
+                    if (!queryDocumentSnapshots.isEmpty()) {
+                        lastDocument = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments()
+                                .get(queryDocumentSnapshots.size() - 1);
+                        hasMoreData = queryDocumentSnapshots.size() == PAGE_SIZE;
+                    } else {
+                        hasMoreData = false;
                     }
                     
                     filterTransactions();
@@ -180,8 +218,65 @@ public class TransactionHistoryActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     showLoading(false);
-                    Toast.makeText(this, "Lỗi tải giao dịch: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                    isLoading = false;
+                    ErrorHandler.handleError(this, e, "Lỗi tải giao dịch");
+                    updateEmptyState();
+                });
+    }
+    
+    private void loadMoreTransactions() {
+        if (isLoading || !hasMoreData || lastDocument == null) return;
+        
+        isLoading = true;
+        loadingMoreLayout.setVisibility(View.VISIBLE);
+
+        Query query;
+        if (accountId != null) {
+            query = transactionRepository.getTransactionsByAccount(accountId)
+                    .startAfter(lastDocument)
+                    .limit(PAGE_SIZE);
+        } else {
+            String userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+            if (userId != null) {
+                query = db.collection("transactions")
+                        .whereEqualTo("userId", userId)
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .startAfter(lastDocument)
+                        .limit(PAGE_SIZE);
+            } else {
+                query = db.collection("transactions")
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .startAfter(lastDocument)
+                        .limit(PAGE_SIZE);
+            }
+        }
+
+        query.get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    isLoading = false;
+                    loadingMoreLayout.setVisibility(View.GONE);
+                    
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Transaction transaction = document.toObject(Transaction.class);
+                        transaction.setTransactionId(document.getId());
+                        allTransactions.add(transaction);
+                    }
+                    
+                    // Update last document for pagination
+                    if (!queryDocumentSnapshots.isEmpty()) {
+                        lastDocument = (QueryDocumentSnapshot) queryDocumentSnapshots.getDocuments()
+                                .get(queryDocumentSnapshots.size() - 1);
+                        hasMoreData = queryDocumentSnapshots.size() == PAGE_SIZE;
+                    } else {
+                        hasMoreData = false;
+                    }
+                    
+                    filterTransactions();
+                })
+                .addOnFailureListener(e -> {
+                    isLoading = false;
+                    loadingMoreLayout.setVisibility(View.GONE);
+                    ErrorHandler.handleError(this, e, "Lỗi tải thêm giao dịch");
                 });
     }
 
@@ -234,4 +329,5 @@ public class TransactionHistoryActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
+    
 }

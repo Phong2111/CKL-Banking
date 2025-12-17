@@ -22,8 +22,12 @@ public class CKLBankingApplication extends Application {
     // Emulator host
     // - Android Emulator: 10.0.2.2 (localhost của máy host)
     // - Physical device: IP của máy tính (ví dụ: 192.168.1.100)
+    // LƯU Ý: Để dùng với điện thoại thật, cần:
+    // 1. Tìm IP máy tính: ipconfig (Windows) hoặc ifconfig (Mac/Linux)
+    // 2. Đảm bảo điện thoại và máy tính cùng mạng WiFi
+    // 3. Đảm bảo firewall cho phép kết nối đến port 8080 và 5001
     private static final String EMULATOR_HOST = "10.0.2.2"; // Android Emulator
-    // private static final String EMULATOR_HOST = "192.168.1.100"; // Physical device
+    // private static final String EMULATOR_HOST = "192.168.1.100"; // Physical device - THAY ĐỔI IP NÀY
     
     // Emulator ports
     private static final int FIRESTORE_PORT = 8080;

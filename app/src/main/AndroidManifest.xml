@@ -112,6 +112,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".activities.BillListActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".activities.PhoneRechargeActivity"
             android:exported="false" />
 
@@ -133,6 +137,10 @@
 
         <activity
             android:name=".activities.BranchLocatorActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".activities.BranchDetailActivity"
             android:exported="false" />
 
         <activity

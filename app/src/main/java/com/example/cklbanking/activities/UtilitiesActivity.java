@@ -57,13 +57,15 @@ public class UtilitiesActivity extends AppCompatActivity {
 
         // Bill payments
         btnElectricityBill.setOnClickListener(v -> {
-            Intent intent = new Intent(UtilitiesActivity.this, BillPaymentActivity.class);
-            intent.putExtra("bill_type", "electricity");
+            // Navigate to bill list instead of direct payment
+            Intent intent = new Intent(UtilitiesActivity.this, BillListActivity.class);
+            intent.putExtra("filter_type", "electricity");
             startActivity(intent);
         });
         btnWaterBill.setOnClickListener(v -> {
-            Intent intent = new Intent(UtilitiesActivity.this, BillPaymentActivity.class);
-            intent.putExtra("bill_type", "water");
+            // Navigate to bill list instead of direct payment
+            Intent intent = new Intent(UtilitiesActivity.this, BillListActivity.class);
+            intent.putExtra("filter_type", "water");
             startActivity(intent);
         });
         btnInternetBill.setOnClickListener(v -> 

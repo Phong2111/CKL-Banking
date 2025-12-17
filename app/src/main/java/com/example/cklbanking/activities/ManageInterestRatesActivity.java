@@ -35,6 +35,7 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private CircularProgressIndicator progressBar;
     private TextView emptyStateText;
+    private MaterialButton btnUpdateAll;
 
     // Firebase
     private FirebaseAuth mAuth;
@@ -68,6 +69,12 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.recyclerView);
         progressBar = findViewById(R.id.progressBar);
         emptyStateText = findViewById(R.id.emptyStateText);
+        btnUpdateAll = findViewById(R.id.btnUpdateAll);
+        
+        // Setup update all button
+        if (btnUpdateAll != null) {
+            btnUpdateAll.setOnClickListener(v -> showUpdateAllDialog());
+        }
     }
 
     private void setupToolbar() {
@@ -153,8 +160,25 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
 
                     try {
                         double newRate = Double.parseDouble(rateStr);
-                        if (newRate < 0 || newRate > 100) {
-                            Toast.makeText(this, "Lãi suất phải từ 0% đến 100%", Toast.LENGTH_SHORT).show();
+                        // Validation: Lãi suất phải > 0 và < 20%
+                        if (newRate <= 0 || newRate >= 20) {
+                            Toast.makeText(this, "Lãi suất phải lớn hơn 0% và nhỏ hơn 20%", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        // Cảnh báo khi thay đổi lớn (> 2%)
+                        double oldRate = account.getInterestRate();
+                        double change = Math.abs(newRate - oldRate);
+                        if (change > 2.0) {
+                            new MaterialAlertDialogBuilder(this)
+                                    .setTitle("Cảnh báo")
+                                    .setMessage(String.format("Bạn đang thay đổi lãi suất từ %.2f%% lên %.2f%% (thay đổi %.2f%%).\n\nThay đổi này có thể ảnh hưởng lớn đến khách hàng. Bạn có chắc chắn muốn tiếp tục?", 
+                                            oldRate, newRate, change))
+                                    .setPositiveButton("Xác nhận", (dialogInterface2, which2) -> {
+                                        updateInterestRate(account, newRate);
+                                    })
+                                    .setNegativeButton("Hủy", null)
+                                    .show();
                             return;
                         }
 
@@ -171,6 +195,9 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
 
     private void updateInterestRate(Account account, double newRate) {
         showLoading(true);
+        
+        // Lưu lịch sử thay đổi (optional)
+        saveInterestRateHistory(account, account.getInterestRate(), newRate);
 
         accountRepository.updateInterestRate(account.getAccountId(), newRate)
                 .addOnSuccessListener(aVoid -> {
@@ -183,6 +210,146 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> {
                     showLoading(false);
                     Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+    
+    /**
+     * Hiển thị dialog để cập nhật lãi suất cho tất cả Saving accounts
+     */
+    private void showUpdateAllDialog() {
+        if (savingAccounts == null || savingAccounts.isEmpty()) {
+            Toast.makeText(this, "Không có tài khoản tiết kiệm nào", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_edit_interest_rate, null);
+        TextInputEditText editInterestRate = dialogView.findViewById(R.id.editInterestRate);
+        
+        // Hiển thị lãi suất hiện tại (lấy từ account đầu tiên làm mẫu)
+        DecimalFormat df = new DecimalFormat("#.##");
+        if (!savingAccounts.isEmpty()) {
+            editInterestRate.setText(df.format(savingAccounts.get(0).getInterestRate()));
+        }
+        
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Cập nhật lãi suất cho tất cả tài khoản tiết kiệm")
+                .setMessage("Lãi suất mới sẽ được áp dụng cho tất cả " + savingAccounts.size() + " tài khoản tiết kiệm.")
+                .setView(dialogView)
+                .setPositiveButton("Cập nhật tất cả", (dialogInterface, which) -> {
+                    String rateStr = editInterestRate.getText().toString().trim();
+                    if (TextUtils.isEmpty(rateStr)) {
+                        Toast.makeText(this, "Vui lòng nhập lãi suất", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    try {
+                        double newRate = Double.parseDouble(rateStr);
+                        // Validation: Lãi suất phải > 0 và < 20%
+                        if (newRate <= 0 || newRate >= 20) {
+                            Toast.makeText(this, "Lãi suất phải lớn hơn 0% và nhỏ hơn 20%", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        
+                        // Cảnh báo khi cập nhật tất cả
+                        new MaterialAlertDialogBuilder(this)
+                                .setTitle("Xác nhận")
+                                .setMessage(String.format("Bạn có chắc chắn muốn cập nhật lãi suất %.2f%% cho tất cả %d tài khoản tiết kiệm?", 
+                                        newRate, savingAccounts.size()))
+                                .setPositiveButton("Xác nhận", (dialogInterface2, which2) -> {
+                                    updateAllInterestRates(newRate);
+                                })
+                                .setNegativeButton("Hủy", null)
+                                .show();
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(this, "Lãi suất không hợp lệ", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Hủy", null)
+                .create();
+        
+        dialog.show();
+    }
+    
+    /**
+     * Cập nhật lãi suất cho tất cả Saving accounts
+     */
+    private void updateAllInterestRates(double newRate) {
+        showLoading(true);
+        
+        int totalAccounts = savingAccounts.size();
+        final int[] successCount = {0};
+        final int[] failCount = {0};
+        
+        for (Account account : savingAccounts) {
+            double oldRate = account.getInterestRate();
+            
+            // Lưu lịch sử
+            saveInterestRateHistory(account, oldRate, newRate);
+            
+            accountRepository.updateInterestRate(account.getAccountId(), newRate)
+                    .addOnSuccessListener(aVoid -> {
+                        account.setInterestRate(newRate);
+                        successCount[0]++;
+                        
+                        // Kiểm tra xem đã cập nhật hết chưa
+                        if (successCount[0] + failCount[0] == totalAccounts) {
+                            showLoading(false);
+                            adapter.notifyDataSetChanged();
+                            
+                            if (failCount[0] == 0) {
+                                Toast.makeText(this, 
+                                        String.format("Đã cập nhật lãi suất thành công cho %d tài khoản!", successCount[0]), 
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(this, 
+                                        String.format("Đã cập nhật %d/%d tài khoản. %d tài khoản gặp lỗi.", 
+                                                successCount[0], totalAccounts, failCount[0]), 
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        failCount[0]++;
+                        
+                        // Kiểm tra xem đã cập nhật hết chưa
+                        if (successCount[0] + failCount[0] == totalAccounts) {
+                            showLoading(false);
+                            
+                            if (successCount[0] > 0) {
+                                adapter.notifyDataSetChanged();
+                                Toast.makeText(this, 
+                                        String.format("Đã cập nhật %d/%d tài khoản. %d tài khoản gặp lỗi.", 
+                                                successCount[0], totalAccounts, failCount[0]), 
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(this, 
+                                        "Lỗi cập nhật tất cả tài khoản: " + e.getMessage(), 
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+        }
+    }
+    
+    /**
+     * Lưu lịch sử thay đổi lãi suất vào Firestore (optional)
+     */
+    private void saveInterestRateHistory(Account account, double oldRate, double newRate) {
+        if (mAuth.getCurrentUser() == null) return;
+        
+        java.util.Map<String, Object> history = new java.util.HashMap<>();
+        history.put("accountId", account.getAccountId());
+        history.put("accountNumber", account.getAccountNumber());
+        history.put("oldRate", oldRate);
+        history.put("newRate", newRate);
+        history.put("changedBy", mAuth.getCurrentUser().getUid());
+        history.put("timestamp", com.google.firebase.Timestamp.now());
+        
+        db.collection("interest_rate_history")
+                .add(history)
+                .addOnFailureListener(e -> {
+                    // Silent fail - không ảnh hưởng đến flow chính
+                    android.util.Log.e("ManageInterestRates", "Failed to save interest rate history", e);
                 });
     }
 
@@ -256,6 +423,12 @@ public class ManageInterestRatesActivity extends AppCompatActivity {
         }
     }
 }
+
+
+
+
+
+
 
 
 

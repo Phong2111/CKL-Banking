@@ -1,6 +1,7 @@
 package com.example.cklbanking.activities;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -39,6 +40,7 @@ import com.google.mlkit.vision.face.Face;
 import com.google.mlkit.vision.face.FaceDetection;
 import com.google.mlkit.vision.face.FaceDetector;
 import com.google.mlkit.vision.face.FaceDetectorOptions;
+import com.example.cklbanking.services.FaceVerificationService;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -70,15 +72,32 @@ public class EKYCActivity extends AppCompatActivity {
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private ExecutorService cameraExecutor;
+    private ExecutorService executorService;
 
     // ML Kit
     private FaceDetector faceDetector;
+    
+    // Face Verification Service
+    private FaceVerificationService faceVerificationService;
 
     // Data
     private String userId;
     private boolean faceDetected = false;
     private String capturedImageUrl;
     private boolean isCapturing = false;
+    
+    // Pending transaction data (if coming from high-value transaction)
+    private double pendingTransactionAmount;
+    private String pendingTransactionType; // "transfer", "deposit", "withdraw", "bill_payment"
+    private String pendingTransactionAccountId;
+    private String pendingTransactionToAccount;
+    private String pendingTransactionRecipient;
+    
+    // Pending bill payment data
+    private String pendingBillPaymentBillId;
+    private String pendingBillPaymentCustomerCode;
+    private String pendingBillPaymentType; // "electricity" or "water"
+    private String pendingBillPaymentProvider; // "EVN" or "SAVACO"
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,9 +117,46 @@ public class EKYCActivity extends AppCompatActivity {
                 .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
                 .build();
         faceDetector = FaceDetection.getClient(options);
+        
+        // Initialize Face Verification Service
+        faceVerificationService = new FaceVerificationService();
 
         // Initialize camera executor
         cameraExecutor = Executors.newSingleThreadExecutor();
+        executorService = Executors.newSingleThreadExecutor();
+        
+        // Get pending transaction data if any
+        pendingTransactionAmount = getIntent().getDoubleExtra("pending_transaction_amount", 0);
+        pendingTransactionType = getIntent().getStringExtra("pending_transaction_type");
+        pendingTransactionAccountId = getIntent().getStringExtra("pending_transaction_account_id");
+        pendingTransactionToAccount = getIntent().getStringExtra("pending_transaction_to_account");
+        pendingTransactionRecipient = getIntent().getStringExtra("pending_transaction_recipient");
+        
+        // Also check for deposit/withdraw pending data
+        if (pendingTransactionAmount == 0) {
+            pendingTransactionAmount = getIntent().getDoubleExtra("pending_deposit_amount", 0);
+            if (pendingTransactionAmount > 0) {
+                pendingTransactionType = "deposit";
+                pendingTransactionAccountId = getIntent().getStringExtra("pending_deposit_account_id");
+            } else {
+                pendingTransactionAmount = getIntent().getDoubleExtra("pending_withdraw_amount", 0);
+                if (pendingTransactionAmount > 0) {
+                    pendingTransactionType = "withdraw";
+                    pendingTransactionAccountId = getIntent().getStringExtra("pending_withdraw_account_id");
+                } else {
+                    // Check for bill payment
+                    pendingTransactionAmount = getIntent().getDoubleExtra("pending_bill_payment_amount", 0);
+                    if (pendingTransactionAmount > 0) {
+                        pendingTransactionType = "bill_payment";
+                        pendingTransactionAccountId = getIntent().getStringExtra("pending_bill_payment_account_id");
+                        pendingBillPaymentBillId = getIntent().getStringExtra("pending_bill_payment_bill_id");
+                        pendingBillPaymentCustomerCode = getIntent().getStringExtra("pending_bill_payment_customer_code");
+                        pendingBillPaymentType = getIntent().getStringExtra("pending_bill_payment_type");
+                        pendingBillPaymentProvider = getIntent().getStringExtra("pending_bill_payment_provider");
+                    }
+                }
+            }
+        }
 
         // Initialize Views
         initViews();
@@ -126,7 +182,15 @@ public class EKYCActivity extends AppCompatActivity {
         // Initial button states
         btnRetake.setVisibility(View.GONE);
         statusText.setVisibility(View.VISIBLE);
-        statusText.setText("Đặt khuôn mặt vào khung hình");
+        
+        // Show appropriate message based on context
+        if (pendingTransactionAmount > 0) {
+            statusText.setText("Giao dịch lớn yêu cầu xác thực eKYC\nĐặt khuôn mặt vào khung hình");
+            statusText.setTextColor(getColor(R.color.warning));
+        } else {
+            statusText.setText("Đặt khuôn mặt vào khung hình");
+            statusText.setTextColor(getColor(R.color.white));
+        }
     }
 
     private void setupToolbar() {
@@ -231,16 +295,25 @@ public class EKYCActivity extends AppCompatActivity {
             .addOnSuccessListener(faces -> {
                 runOnUiThread(() -> {
                     if (!faces.isEmpty() && !isCapturing) {
-                    faceDetected = true;
-                        statusText.setText("Khuôn mặt đã được phát hiện! Nhấn nút để chụp");
-                    statusText.setTextColor(getColor(R.color.success));
+                        faceDetected = true;
+                        if (pendingTransactionAmount > 0) {
+                            statusText.setText("✓ Khuôn mặt đã được phát hiện!\nNhấn nút để xác thực");
+                        } else {
+                            statusText.setText("✓ Khuôn mặt đã được phát hiện!\nNhấn nút để chụp");
+                        }
+                        statusText.setTextColor(getColor(R.color.success));
                         btnCapture.setEnabled(true);
                     } else if (faces.isEmpty() && !isCapturing) {
-                    faceDetected = false;
-                        statusText.setText("Đặt khuôn mặt vào khung hình");
-                        statusText.setTextColor(getColor(R.color.text_primary));
+                        faceDetected = false;
+                        if (pendingTransactionAmount > 0) {
+                            statusText.setText("Giao dịch lớn yêu cầu xác thực eKYC\nĐặt khuôn mặt vào khung hình");
+                            statusText.setTextColor(getColor(R.color.warning));
+                        } else {
+                            statusText.setText("Đặt khuôn mặt vào khung hình");
+                            statusText.setTextColor(getColor(R.color.white));
+                        }
                         btnCapture.setEnabled(false);
-                }
+                    }
                 });
             })
             .addOnFailureListener(e -> {
@@ -320,15 +393,20 @@ public class EKYCActivity extends AppCompatActivity {
             storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
                 capturedImageUrl = uri.toString();
                 runOnUiThread(() -> {
-            statusText.setText("Ảnh đã được chụp thành công!");
-            statusText.setTextColor(getColor(R.color.success));
-            btnCapture.setVisibility(View.GONE);
-            btnRetake.setVisibility(View.VISIBLE);
-                    showLoading(false);
+                    if (pendingTransactionAmount > 0) {
+                        statusText.setText("Đang xác thực khuôn mặt...");
+                        statusText.setTextColor(getColor(R.color.info));
+                    } else {
+                        statusText.setText("Ảnh đã được chụp thành công!");
+                        statusText.setTextColor(getColor(R.color.success));
+                    }
+                    btnCapture.setVisibility(View.GONE);
+                    btnRetake.setVisibility(View.VISIBLE);
+                    showLoading(true); // Keep loading during verification
                     isCapturing = false;
             
-            // Auto submit after capture
-            submitEKYC();
+                    // Auto submit after capture
+                    submitEKYC();
                 });
             }).addOnFailureListener(e -> {
                 runOnUiThread(() -> {
@@ -375,7 +453,124 @@ public class EKYCActivity extends AppCompatActivity {
         }
 
         showLoading(true);
-
+        
+        // If this is for high-value transaction verification, verify face match first
+        if (pendingTransactionAmount > 0) {
+            verifyFaceForTransaction();
+        } else {
+            // Regular eKYC submission
+            updateEkycStatus();
+        }
+    }
+    
+    /**
+     * Verify face match for high-value transaction
+     */
+    private void verifyFaceForTransaction() {
+        // Get stored face image URL
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (!documentSnapshot.exists()) {
+                        showLoading(false);
+                        Toast.makeText(this, "Không tìm thấy thông tin người dùng", 
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    String storedFaceImageUrl = documentSnapshot.getString("faceImageUrl");
+                    
+                    if (storedFaceImageUrl == null || storedFaceImageUrl.isEmpty()) {
+                        // No stored image - this is first time eKYC
+                        updateEkycStatus();
+                        return;
+                    }
+                    
+                    // Load current captured image
+                    loadAndVerifyFace(capturedImageUrl, storedFaceImageUrl);
+                })
+                .addOnFailureListener(e -> {
+                    showLoading(false);
+                    Toast.makeText(this, "Lỗi: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
+    }
+    
+    /**
+     * Load and verify face match
+     */
+    private void loadAndVerifyFace(String currentImageUrl, String storedImageUrl) {
+        // Download current image
+        executorService.execute(() -> {
+            try {
+                Bitmap currentBitmap = downloadImage(currentImageUrl);
+                
+                if (currentBitmap == null) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        Toast.makeText(this, "Không thể tải ảnh hiện tại", 
+                            Toast.LENGTH_SHORT).show();
+                    });
+                    return;
+                }
+                
+                // Verify face match
+                faceVerificationService.verifyFaceMatch(currentBitmap, storedImageUrl, 
+                    (isMatch, message) -> {
+                        runOnUiThread(() -> {
+                            if (isMatch) {
+                                // Face matches - update eKYC and continue transaction
+                                statusText.setText("✓ Xác thực thành công!\nĐang cập nhật...");
+                                statusText.setTextColor(getColor(R.color.success));
+                                updateEkycStatus();
+                            } else {
+                                // Face doesn't match - show error
+                                showLoading(false);
+                                statusText.setText("✗ Xác thực thất bại\n" + message);
+                                statusText.setTextColor(getColor(R.color.error));
+                                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                btnRetake.setVisibility(View.VISIBLE);
+                                btnCapture.setVisibility(View.GONE);
+                            }
+                        });
+                    });
+                    
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    showLoading(false);
+                    Toast.makeText(this, "Lỗi xác thực: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+    
+    /**
+     * Download image from URL
+     */
+    private Bitmap downloadImage(String imageUrl) {
+        try {
+            java.net.URL url = new java.net.URL(imageUrl);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            
+            java.io.InputStream input = connection.getInputStream();
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            input.close();
+            
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Error downloading image", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Update eKYC status in Firestore
+     */
+    private void updateEkycStatus() {
         // Update user eKYC status
         Map<String, Object> updates = new HashMap<>();
         updates.put("ekycStatus", "verified");
@@ -389,6 +584,22 @@ public class EKYCActivity extends AppCompatActivity {
                     showLoading(false);
                     Toast.makeText(this, "Xác thực eKYC thành công!", 
                         Toast.LENGTH_SHORT).show();
+                    
+                    // If there's a pending transaction, return to it
+                    if (pendingTransactionAmount > 0) {
+                        // Return to previous activity with success flag
+                        Intent resultIntent = new Intent();
+                        resultIntent.putExtra("ekyc_verified", true);
+                        if ("bill_payment".equals(pendingTransactionType)) {
+                            // For bill payment, return with bill info
+                            resultIntent.putExtra("bill_id", pendingBillPaymentBillId);
+                            resultIntent.putExtra("customer_code", pendingBillPaymentCustomerCode);
+                            resultIntent.putExtra("amount", pendingTransactionAmount);
+                            resultIntent.putExtra("account_id", pendingTransactionAccountId);
+                        }
+                        setResult(RESULT_OK, resultIntent);
+                    }
+                    
                     finish();
                 })
                 .addOnFailureListener(e -> {
@@ -411,8 +622,14 @@ public class EKYCActivity extends AppCompatActivity {
         if (faceDetector != null) {
             faceDetector.close();
         }
+        if (faceVerificationService != null) {
+            faceVerificationService.cleanup();
+        }
         if (cameraExecutor != null) {
             cameraExecutor.shutdown();
+        }
+        if (executorService != null) {
+            executorService.shutdown();
         }
     }
 }

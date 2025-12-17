@@ -86,6 +86,7 @@
                     </LinearLayout>
 
                     <TextView
+                        android:id="@+id/balanceLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/account_balance"
@@ -125,6 +126,16 @@
                                 android:text="@string/interest_rate"
                                 android:textColor="@color/white"
                                 android:textSize="12sp"/>
+
+                            <!-- Label for biweekly payment (for mortgage) -->
+                            <TextView
+                                android:id="@+id/biweeklyPaymentLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Trả mỗi 2 tuần"
+                                android:textColor="@color/white"
+                                android:textSize="12sp"
+                                android:visibility="gone"/>
 
                             <TextView
                                 android:id="@+id/interestRateValue"
@@ -295,14 +306,17 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:orientation="vertical"
+                        android:background="@color/primary_light"
+                        android:padding="12dp"
+                        android:layout_marginTop="8dp">
 
                         <TextView
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
                             android:text="Lãi dự kiến"
-                            style="@style/TextBody"/>
+                            style="@style/TextCaption"
+                            android:layout_marginBottom="4dp"/>
 
                         <TextView
                             android:id="@+id/expectedInterest"
@@ -310,7 +324,7 @@
                             android:layout_height="wrap_content"
                             android:text="11,000,000 ₫"
                             android:textColor="@color/success"
-                            android:textSize="14sp"
+                            android:textSize="16sp"
                             android:textStyle="bold"/>
                     </LinearLayout>
                 </LinearLayout>

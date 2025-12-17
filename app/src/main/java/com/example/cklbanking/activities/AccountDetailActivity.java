@@ -37,7 +37,8 @@ public class AccountDetailActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private TextView accountTypeName, accountNumber, accountBalance;
-    private TextView interestRateValue, amountDueValue;
+    private TextView balanceLabel; // Label for balance (changes for mortgage)
+    private TextView interestRateValue, interestRateLabel, biweeklyPaymentLabel, amountDueValue;
     private View additionalInfoLayout, amountDueLayout;
     private MaterialCardView statisticsCard;
     private TextView savingTerm, openDate, maturityDate, expectedInterest;
@@ -107,10 +108,13 @@ public class AccountDetailActivity extends AppCompatActivity {
         accountTypeName = findViewById(R.id.accountTypeName);
         accountNumber = findViewById(R.id.accountNumber);
         accountBalance = findViewById(R.id.accountBalance);
+        balanceLabel = findViewById(R.id.balanceLabel);
         accountTypeIcon = findViewById(R.id.accountTypeIcon);
         
         additionalInfoLayout = findViewById(R.id.additionalInfoLayout);
         interestRateValue = findViewById(R.id.interestRateValue);
+        interestRateLabel = findViewById(R.id.interestRateLabel);
+        biweeklyPaymentLabel = findViewById(R.id.biweeklyPaymentLabel);
         amountDueLayout = findViewById(R.id.amountDueLayout);
         amountDueValue = findViewById(R.id.amountDueValue);
         
@@ -188,15 +192,19 @@ public class AccountDetailActivity extends AppCompatActivity {
 
         // Update account info
         accountNumber.setText(account.getAccountNumber());
-        accountBalance.setText(formatCurrency(account.getBalance()));
-
+        
         // Update based on account type
         switch (account.getAccountType()) {
             case "checking":
-                accountTypeName.setText("Tài khoản thanh toán");
+                accountTypeName.setText("Tài khoản vãng lai");
                 toolbar.setBackgroundColor(getColor(R.color.checking_account));
                 additionalInfoLayout.setVisibility(View.GONE);
                 statisticsCard.setVisibility(View.GONE);
+                // Show balance for checking account
+                if (balanceLabel != null) {
+                    balanceLabel.setText("Số dư");
+                }
+                accountBalance.setText(formatCurrency(account.getBalance()));
                 break;
 
             case "saving":
@@ -206,7 +214,20 @@ public class AccountDetailActivity extends AppCompatActivity {
                 statisticsCard.setVisibility(View.VISIBLE);
                 amountDueLayout.setVisibility(View.GONE);
                 
+                // Show balance for saving account
+                if (balanceLabel != null) {
+                    balanceLabel.setText("Số dư");
+                }
+                accountBalance.setText(formatCurrency(account.getBalance()));
+                
                 // Show interest rate
+                if (interestRateLabel != null) {
+                    interestRateLabel.setText("Lãi suất");
+                    interestRateLabel.setVisibility(View.VISIBLE);
+                }
+                if (biweeklyPaymentLabel != null) {
+                    biweeklyPaymentLabel.setVisibility(View.GONE);
+                }
                 if (account.getInterestRate() > 0) {
                     interestRateValue.setText(String.format(Locale.getDefault(), "%.2f%%/năm", account.getInterestRate()));
                 } else {
@@ -232,12 +253,16 @@ public class AccountDetailActivity extends AppCompatActivity {
                     maturityDate.setText("Chưa có");
                 }
                 
-                // Tính lợi nhuận hàng tháng = (Balance × Interest Rate) / 12
-                double monthlyProfit = 0;
-                if (account.getInterestRate() > 0 && account.getBalance() > 0) {
-                    monthlyProfit = (account.getBalance() * account.getInterestRate()) / 12.0 / 100.0;
+                // Tính lợi nhuận hàng tháng = (Balance × Interest Rate) / 12 / 100
+                double monthlyProfit = calculateMonthlyProfit(account);
+                double totalProfit = calculateTotalProfit(account);
+                
+                // Hiển thị lợi nhuận/tháng và tổng lợi nhuận tích lũy
+                String profitText = formatCurrency(monthlyProfit) + "/tháng";
+                if (totalProfit > 0) {
+                    profitText += "\n(Tổng tích lũy: " + formatCurrency(totalProfit) + ")";
                 }
-                expectedInterest.setText(formatCurrency(monthlyProfit) + "/tháng");
+                expectedInterest.setText(profitText);
                 break;
 
             case "mortgage":
@@ -247,6 +272,17 @@ public class AccountDetailActivity extends AppCompatActivity {
                 statisticsCard.setVisibility(View.GONE);
                 amountDueLayout.setVisibility(View.VISIBLE);
                 
+                // Hiển thị số dư nợ còn lại (remainingBalance) thay vì balance
+                if (balanceLabel != null) {
+                    balanceLabel.setText("Số dư nợ còn lại");
+                }
+                if (account.getRemainingBalance() > 0) {
+                    accountBalance.setText(formatCurrency(account.getRemainingBalance()));
+                } else {
+                    // Fallback to balance if remainingBalance is not set
+                    accountBalance.setText(formatCurrency(account.getBalance()));
+                }
+                
                 // Show monthly payment
                 if (account.getMonthlyPayment() > 0) {
                     amountDueValue.setText(formatCurrency(account.getMonthlyPayment()) + "/tháng");
@@ -254,11 +290,19 @@ public class AccountDetailActivity extends AppCompatActivity {
                     amountDueValue.setText("Chưa có");
                 }
                 
+                // Ẩn interest rate label, hiển thị biweekly payment label
+                if (interestRateLabel != null) {
+                    interestRateLabel.setVisibility(View.GONE);
+                }
+                if (biweeklyPaymentLabel != null) {
+                    biweeklyPaymentLabel.setVisibility(View.VISIBLE);
+                }
+                
                 // Hiển thị bi-weekly payment nếu có
                 if (account.getBiweeklyPayment() > 0) {
-                    // Có thể thêm TextView riêng hoặc hiển thị trong cùng layout
-                    // Tạm thời hiển thị trong interestRateValue (không dùng cho mortgage)
                     interestRateValue.setText(formatCurrency(account.getBiweeklyPayment()) + "/2 tuần");
+                } else {
+                    interestRateValue.setText("Chưa có");
                 }
                 break;
         }
@@ -310,6 +354,54 @@ public class AccountDetailActivity extends AppCompatActivity {
         Intent intent = new Intent(this, TransactionHistoryActivity.class);
         intent.putExtra("account_id", accountId);
         startActivity(intent);
+    }
+
+    /**
+     * Calculate monthly profit for saving account
+     * Formula: balance * interestRate / 12 / 100
+     * @param account Account object
+     * @return Monthly profit amount
+     */
+    private double calculateMonthlyProfit(Account account) {
+        if (account == null || !"saving".equals(account.getAccountType())) {
+            return 0;
+        }
+        
+        if (account.getInterestRate() <= 0 || account.getBalance() <= 0) {
+            return 0;
+        }
+        
+        // Formula: balance * interestRate / 12 / 100
+        return (account.getBalance() * account.getInterestRate()) / 12.0 / 100.0;
+    }
+    
+    /**
+     * Calculate total accumulated profit for saving account
+     * Formula: balance * interestRate * months / 12 / 100
+     * @param account Account object
+     * @return Total accumulated profit
+     */
+    private double calculateTotalProfit(Account account) {
+        if (account == null || !"saving".equals(account.getAccountType())) {
+            return 0;
+        }
+        
+        if (account.getInterestRate() <= 0 || account.getBalance() <= 0) {
+            return 0;
+        }
+        
+        if (account.getOpenDate() == null) {
+            return 0;
+        }
+        
+        // Calculate months from openDate to now
+        long openTime = account.getOpenDate().getTime();
+        long currentTime = System.currentTimeMillis();
+        long diffTime = currentTime - openTime;
+        double months = diffTime / (1000.0 * 60 * 60 * 24 * 30.44); // Average days per month
+        
+        // Formula: balance * interestRate * months / 12 / 100
+        return (account.getBalance() * account.getInterestRate() * months) / 12.0 / 100.0;
     }
 
     private String formatCurrency(double amount) {

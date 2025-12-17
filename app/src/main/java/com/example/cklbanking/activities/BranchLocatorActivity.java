@@ -27,6 +27,8 @@ import com.example.cklbanking.R;
 import com.example.cklbanking.adapters.BranchAdapter;
 import com.example.cklbanking.models.Branch;
 import com.example.cklbanking.repositories.BranchRepository;
+import com.example.cklbanking.utils.AnimationHelper;
+import com.example.cklbanking.utils.BranchDistanceHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationRequest;
@@ -35,6 +37,8 @@ import com.google.android.gms.location.LocationResult;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
@@ -59,10 +63,25 @@ public class BranchLocatorActivity extends AppCompatActivity {
     private LocationCallback locationCallback;
     private Location currentLocation;
     private List<Branch> branches;
+    private List<Branch> filteredBranches; // Filtered and sorted branches
     private Branch nearestBranch;
     private BranchRepository branchRepository;
     private BranchAdapter branchAdapter;
     private boolean mapReady = false;
+    
+    // Filter UI components
+    private ChipGroup chipGroupDistance, chipGroupType;
+    private Chip chipDistanceAll, chipDistance1km, chipDistance5km, chipDistance10km;
+    private Chip chipTypeAll, chipTypeBranch, chipTypeATM;
+    private Chip chipOnlyOpen;
+    
+    // Filter values
+    private double maxDistanceMeters = Double.MAX_VALUE; // Default: no limit
+    private String filterType = "all"; // "all", "branch", "atm"
+    private boolean onlyOpen = false;
+    
+    // User ID for favorite branches
+    private String userId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +91,10 @@ public class BranchLocatorActivity extends AppCompatActivity {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         branchRepository = new BranchRepository();
         branches = new ArrayList<>();
+        
+        // Get user ID for favorite branches
+        com.google.firebase.auth.FirebaseAuth mAuth = com.google.firebase.auth.FirebaseAuth.getInstance();
+        userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
         
         initViews();
         setupRecyclerView();
@@ -92,6 +115,20 @@ public class BranchLocatorActivity extends AppCompatActivity {
         branchStatus = findViewById(R.id.branchStatus);
         branchesRecyclerView = findViewById(R.id.branchesRecyclerView);
         
+        // Filter UI
+        chipGroupDistance = findViewById(R.id.chipGroupDistance);
+        chipGroupType = findViewById(R.id.chipGroupType);
+        chipDistanceAll = findViewById(R.id.chipDistanceAll);
+        chipDistance1km = findViewById(R.id.chipDistance1km);
+        chipDistance5km = findViewById(R.id.chipDistance5km);
+        chipDistance10km = findViewById(R.id.chipDistance10km);
+        chipTypeAll = findViewById(R.id.chipTypeAll);
+        chipTypeBranch = findViewById(R.id.chipTypeBranch);
+        chipTypeATM = findViewById(R.id.chipTypeATM);
+        chipOnlyOpen = findViewById(R.id.chipOnlyOpen);
+        
+        filteredBranches = new ArrayList<>();
+        
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -102,6 +139,108 @@ public class BranchLocatorActivity extends AppCompatActivity {
         fabMyLocation.setOnClickListener(v -> centerMapOnUserLocation());
         btnGetDirections.setOnClickListener(v -> openNavigation());
         btnCall.setOnClickListener(v -> callBranch());
+        
+        setupFilterListeners();
+    }
+    
+    private void setupFilterListeners() {
+        // Distance filter
+        chipDistanceAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                maxDistanceMeters = Double.MAX_VALUE;
+                applyFilters();
+            }
+        });
+        chipDistance1km.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                maxDistanceMeters = 1000; // 1 km
+                applyFilters();
+            }
+        });
+        chipDistance5km.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                maxDistanceMeters = 5000; // 5 km
+                applyFilters();
+            }
+        });
+        chipDistance10km.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                maxDistanceMeters = 10000; // 10 km
+                applyFilters();
+            }
+        });
+        
+        // Type filter
+        chipTypeAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                filterType = "all";
+                applyFilters();
+            }
+        });
+        chipTypeBranch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                filterType = "branch";
+                applyFilters();
+            }
+        });
+        chipTypeATM.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                filterType = "atm";
+                applyFilters();
+            }
+        });
+        
+        // Only open filter
+        chipOnlyOpen.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            onlyOpen = isChecked;
+            applyFilters();
+        });
+    }
+    
+    /**
+     * Áp dụng tất cả filters và sắp xếp danh sách
+     */
+    private void applyFilters() {
+        if (branches == null || branches.isEmpty()) {
+            return;
+        }
+        
+        // Start with all branches
+        filteredBranches = new ArrayList<>(branches);
+        
+        // Filter by distance
+        if (currentLocation != null && maxDistanceMeters < Double.MAX_VALUE) {
+            filteredBranches = BranchDistanceHelper.filterByDistance(
+                filteredBranches, currentLocation, maxDistanceMeters);
+        }
+        
+        // Filter by type
+        if (!"all".equals(filterType)) {
+            filteredBranches = BranchDistanceHelper.filterByType(filteredBranches, filterType);
+        }
+        
+        // Filter by open status
+        if (onlyOpen) {
+            filteredBranches = BranchDistanceHelper.filterByOpenStatus(filteredBranches, true);
+        }
+        
+        // Sort by distance
+        if (currentLocation != null) {
+            BranchDistanceHelper.sortByDistance(filteredBranches, currentLocation);
+        }
+        
+        // Update adapter
+        branchAdapter.updateBranches(filteredBranches);
+        
+        // Update map markers
+        if (mapReady) {
+            addBranchMarkers();
+        }
+        
+        // Update nearest branch
+        if (currentLocation != null && !filteredBranches.isEmpty()) {
+            findNearestBranch();
+        }
     }
 
     private void setupWebView() {
@@ -173,20 +312,16 @@ public class BranchLocatorActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        branchAdapter = new BranchAdapter(this, branches);
+        branchAdapter = new BranchAdapter(this, filteredBranches);
         branchAdapter.setOnBranchClickListener(branch -> {
-            showBranchOnMap(branch);
+            // Open branch detail activity
+            Intent intent = new Intent(this, BranchDetailActivity.class);
+            intent.putExtra("branch", branch);
             if (currentLocation != null) {
-                float[] results = new float[1];
-                Location.distanceBetween(
-                        currentLocation.getLatitude(), currentLocation.getLongitude(),
-                        branch.getLatitude(), branch.getLongitude(),
-                        results
-                );
-                updateNearestBranchUI(results[0]);
-                nearestBranch = branch;
-                drawRouteToNearestBranch();
+                intent.putExtra("user_location", currentLocation);
             }
+            startActivity(intent);
+            AnimationHelper.applyActivityTransition(this);
         });
         
         branchesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -209,7 +344,11 @@ public class BranchLocatorActivity extends AppCompatActivity {
                         initializeSampleBranches();
                     }
                     
-                    branchAdapter.updateBranches(branches);
+                    // Load favorite status for all branches
+                    loadFavoriteStatus();
+                    
+                    // Apply filters and sort
+                    applyFilters();
                     branchAdapter.setUserLocation(currentLocation);
                     
                     if (mapReady) {
@@ -224,7 +363,8 @@ public class BranchLocatorActivity extends AppCompatActivity {
                     Toast.makeText(this, "Lỗi tải danh sách chi nhánh: " + e.getMessage(), 
                         Toast.LENGTH_SHORT).show();
                     initializeSampleBranches();
-                    branchAdapter.updateBranches(branches);
+                    loadFavoriteStatus();
+                    applyFilters();
                     if (mapReady) {
                         addBranchMarkers();
                     }
@@ -232,16 +372,94 @@ public class BranchLocatorActivity extends AppCompatActivity {
     }
 
     private void initializeSampleBranches() {
-        branches.add(new Branch("Chi nhánh Quận 1", "123 Nguyễn Huệ, P.Bến Nghé, Q.1, TP.HCM", 
-            10.7769, 106.7009, "02838291234", "8:00 - 17:00", "branch"));
-        branches.add(new Branch("Chi nhánh Quận 3", "456 Lê Văn Sỹ, P.12, Q.3, TP.HCM", 
-            10.7929, 106.6900, "02838291235", "8:00 - 17:00", "branch"));
-        branches.add(new Branch("Chi nhánh Quận 7", "789 Nguyễn Thị Thập, P.Tân Phú, Q.7, TP.HCM", 
-            10.7299, 106.7219, "02838291236", "8:00 - 17:00", "branch"));
-        branches.add(new Branch("ATM Quận 1", "321 Đồng Khởi, Q.1, TP.HCM", 
-            10.7756, 106.7019, "02838291237", "24/7", "atm"));
-        branches.add(new Branch("ATM Quận 2", "654 Nguyễn Duy Trinh, Q.2, TP.HCM", 
-            10.7874, 106.7493, "02838291238", "24/7", "atm"));
+        // Chi nhánh Quận 1
+        Branch branch1 = new Branch("Chi nhánh Quận 1", "123 Nguyễn Huệ, P.Bến Nghé, Q.1, TP.HCM", 
+            10.7769, 106.7009, "02838291234", "8:00 - 17:00", "branch");
+        branch1.setBranchId("branch_1");
+        java.util.List<String> services1 = new ArrayList<>();
+        services1.add("Gửi tiết kiệm");
+        services1.add("Vay vốn");
+        services1.add("Tư vấn tài chính");
+        services1.add("Chuyển khoản");
+        branch1.setServices(services1);
+        branches.add(branch1);
+        
+        // Chi nhánh Quận 3
+        Branch branch2 = new Branch("Chi nhánh Quận 3", "456 Lê Văn Sỹ, P.12, Q.3, TP.HCM", 
+            10.7929, 106.6900, "02838291235", "8:00 - 17:00", "branch");
+        branch2.setBranchId("branch_2");
+        java.util.List<String> services2 = new ArrayList<>();
+        services2.add("Gửi tiết kiệm");
+        services2.add("Vay vốn");
+        services2.add("Tư vấn tài chính");
+        branch2.setServices(services2);
+        branches.add(branch2);
+        
+        // Chi nhánh Quận 7
+        Branch branch3 = new Branch("Chi nhánh Quận 7", "789 Nguyễn Thị Thập, P.Tân Phú, Q.7, TP.HCM", 
+            10.7299, 106.7219, "02838291236", "8:00 - 17:00", "branch");
+        branch3.setBranchId("branch_3");
+        java.util.List<String> services3 = new ArrayList<>();
+        services3.add("Gửi tiết kiệm");
+        services3.add("Vay vốn");
+        branch3.setServices(services3);
+        branches.add(branch3);
+        
+        // ATM Quận 1
+        Branch atm1 = new Branch("ATM Quận 1", "321 Đồng Khởi, Q.1, TP.HCM", 
+            10.7756, 106.7019, "02838291237", "24/7", "atm");
+        atm1.setBranchId("atm_1");
+        java.util.List<String> atmServices1 = new ArrayList<>();
+        atmServices1.add("Rút tiền");
+        atmServices1.add("Chuyển khoản");
+        atm1.setServices(atmServices1);
+        branches.add(atm1);
+        
+        // ATM Quận 2
+        Branch atm2 = new Branch("ATM Quận 2", "654 Nguyễn Duy Trinh, Q.2, TP.HCM", 
+            10.7874, 106.7493, "02838291238", "24/7", "atm");
+        atm2.setBranchId("atm_2");
+        java.util.List<String> atmServices2 = new ArrayList<>();
+        atmServices2.add("Rút tiền");
+        atmServices2.add("Chuyển khoản");
+        atm2.setServices(atmServices2);
+        branches.add(atm2);
+    }
+    
+    /**
+     * Load favorite status for all branches
+     */
+    private void loadFavoriteStatus() {
+        if (userId == null || branches == null || branches.isEmpty()) {
+            return;
+        }
+        
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        db.collection("favorite_branches")
+                .whereEqualTo("userId", userId)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    java.util.Set<String> favoriteBranchIds = new java.util.HashSet<>();
+                    for (com.google.firebase.firestore.QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        String branchId = document.getString("branchId");
+                        if (branchId != null) {
+                            favoriteBranchIds.add(branchId);
+                        }
+                    }
+                    
+                    // Update favorite status for all branches
+                    for (Branch branch : branches) {
+                        branch.setFavorite(favoriteBranchIds.contains(branch.getBranchId()));
+                    }
+                    
+                    // Notify adapter
+                    if (branchAdapter != null) {
+                        branchAdapter.notifyDataSetChanged();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("BranchLocator", "Error loading favorite status", e);
+                });
     }
 
     private void showBranchOnMap(Branch branch) {
@@ -254,13 +472,8 @@ public class BranchLocatorActivity extends AppCompatActivity {
         if (currentLocation != null) {
             nearestBranch = branch;
             drawRouteToNearestBranch();
-            float[] results = new float[1];
-            Location.distanceBetween(
-                    currentLocation.getLatitude(), currentLocation.getLongitude(),
-                    branch.getLatitude(), branch.getLongitude(),
-                    results
-            );
-            updateNearestBranchUI(results[0]);
+            double distance = BranchDistanceHelper.calculateDistance(currentLocation, branch);
+            updateNearestBranchUI(distance);
         }
     }
 
@@ -323,6 +536,7 @@ public class BranchLocatorActivity extends AppCompatActivity {
             findNearestBranch();
             if (branchAdapter != null) {
                 branchAdapter.setUserLocation(emulatorLocation);
+                applyFilters();
             }
             
             // Vẫn thử lấy location thật nếu có (cho trường hợp dùng Extended Controls)
@@ -377,6 +591,8 @@ public class BranchLocatorActivity extends AppCompatActivity {
                         findNearestBranch();
                         if (branchAdapter != null) {
                             branchAdapter.setUserLocation(location);
+                            // Re-apply filters when location updates
+                            applyFilters();
                         }
                     }
                 }
@@ -411,6 +627,7 @@ public class BranchLocatorActivity extends AppCompatActivity {
                         findNearestBranch();
                         if (branchAdapter != null) {
                             branchAdapter.setUserLocation(location);
+                            applyFilters();
                         }
                     } else if (isEmulator() && currentLocation == null) {
                         // Nếu không có location và đang chạy emulator, dùng location mặc định
@@ -429,6 +646,7 @@ public class BranchLocatorActivity extends AppCompatActivity {
                         findNearestBranch();
                         if (branchAdapter != null) {
                             branchAdapter.setUserLocation(vietnamLocation);
+                            applyFilters();
                         }
                     }
                 });
@@ -450,13 +668,13 @@ public class BranchLocatorActivity extends AppCompatActivity {
     }
 
     private void addBranchMarkers() {
-        if (!mapReady || branches == null) return;
+        if (!mapReady || filteredBranches == null) return;
         
         // Clear existing markers
         mapWebView.evaluateJavascript("window.clearMarkers();", null);
         
-        // Add all branch markers
-        for (Branch branch : branches) {
+        // Add filtered branch markers
+        for (Branch branch : filteredBranches) {
             String js = String.format(
                 "window.addBranchMarker(%f, %f, '%s', '%s', '%s');",
                 branch.getLatitude(), branch.getLongitude(),
@@ -469,32 +687,16 @@ public class BranchLocatorActivity extends AppCompatActivity {
     }
 
     private void findNearestBranch() {
-        if (currentLocation == null || branches == null || branches.isEmpty()) return;
+        if (currentLocation == null || filteredBranches == null || filteredBranches.isEmpty()) return;
         
-        double minDistance = Double.MAX_VALUE;
-        Branch nearest = null;
+        // Since filteredBranches is already sorted by distance, first item is nearest
+        Branch nearest = filteredBranches.get(0);
+        double distance = BranchDistanceHelper.calculateDistance(currentLocation, nearest);
         
-        for (Branch branch : branches) {
-            float[] results = new float[1];
-            Location.distanceBetween(
-                    currentLocation.getLatitude(), currentLocation.getLongitude(),
-                    branch.getLatitude(), branch.getLongitude(),
-                    results
-            );
-            
-            double distance = results[0];
-            if (distance < minDistance) {
-                minDistance = distance;
-                nearest = branch;
-            }
-        }
-        
-        if (nearest != null) {
-            nearestBranch = nearest;
-            updateNearestBranchUI(minDistance);
-            if (mapReady) {
-                drawRouteToNearestBranch();
-            }
+        nearestBranch = nearest;
+        updateNearestBranchUI(distance);
+        if (mapReady) {
+            drawRouteToNearestBranch();
         }
     }
 
@@ -503,14 +705,7 @@ public class BranchLocatorActivity extends AppCompatActivity {
         
         branchName.setText(nearestBranch.getName());
         branchAddress.setText(nearestBranch.getAddress());
-        
-        String distanceText;
-        if (distanceInMeters < 1000) {
-            distanceText = String.format("%.0f m", distanceInMeters);
-        } else {
-            distanceText = String.format("%.2f km", distanceInMeters / 1000);
-        }
-        branchDistance.setText(distanceText);
+        branchDistance.setText(BranchDistanceHelper.formatDistance(distanceInMeters));
         
         branchStatus.setText(nearestBranch.isOpen() ? "Đang mở cửa" : "Đã đóng cửa");
         branchStatus.setTextColor(getColor(nearestBranch.isOpen() ? R.color.success : R.color.error));
@@ -560,6 +755,11 @@ public class BranchLocatorActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             getCurrentLocation();
+        }
+        
+        // Reload favorite status when returning from BranchDetailActivity
+        if (branches != null && !branches.isEmpty()) {
+            loadFavoriteStatus();
         }
     }
     

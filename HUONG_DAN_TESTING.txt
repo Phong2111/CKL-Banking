@@ -1,0 +1,1019 @@
+================================================================================
+                    HƯỚNG DẪN SỬ DỤNG ĐỂ TESTING - CKL BANKING
+================================================================================
+
+MỤC ĐÍCH: File này cung cấp hướng dẫn chi tiết để thực hiện testing cho ứng 
+dụng CKL Banking, bao gồm setup môi trường, cách chạy app, test cases, và các bước thực hiện.
+================================================================================
+PHẦN 1: CHUẨN BỊ MÔI TRƯỜNG TESTING
+================================================================================
+
+1.1. YÊU CẦU HỆ THỐNG:
+    ✓ Android Studio (latest version)
+    ✓ Android SDK (minSdk 25, targetSdk 36)
+    ✓ Java 11
+    ✓ Firebase CLI
+    ✓ Node.js (cho Cloud Functions)
+    ✓ Android Emulator hoặc Physical Device
+
+1.1b. KẾT NỐI ĐIỆN THOẠI THẬT VỚI FIREBASE EMULATOR:
+    
+    ⚠️ QUAN TRỌNG: Khi chạy Firebase Emulator (Docker hoặc Firebase CLI), bạn CÓ THỂ 
+    kết nối từ điện thoại thật và sử dụng TẤT CẢ chức năng của app!
+    
+    Các bước thiết lập:
+    
+    Bước 1: Tìm IP máy tính
+    - Windows: Mở PowerShell → gõ "ipconfig" → Tìm "IPv4 Address" (ví dụ: 192.168.1.100)
+    - Mac/Linux: Mở Terminal → gõ "ifconfig" → Tìm IP trong WiFi network
+    
+    Bước 2: Khởi động Firebase Emulator
+    - firebase emulators:start
+    - Hoặc docker-compose up (nếu dùng Docker)
+    - Kiểm tra: http://localhost:4000 (Emulator UI)
+    
+    Bước 3: Mở Firewall (QUAN TRỌNG!)
+    - Windows: Mở port 8080 (Firestore) và 5001 (Functions)
+    - Mac/Linux: sudo ufw allow 8080/tcp && sudo ufw allow 5001/tcp
+    - Đảm bảo cả Private và Public networks đều cho phép
+    
+    Bước 4: Cấu hình App
+    - Mở: app/src/main/java/com/example/cklbanking/CKLBankingApplication.java
+    - Đảm bảo: USE_EMULATOR = true
+    - Thay đổi: EMULATOR_HOST = "192.168.1.100" (IP máy tính của bạn)
+    - KHÔNG dùng "10.0.2.2" (chỉ dùng cho Android Emulator)
+    
+    Bước 5: Đảm bảo cùng mạng WiFi
+    - Điện thoại và máy tính phải cùng WiFi
+    - Không dùng mobile data
+    
+    Bước 6: Build và Install
+    - Build app với cấu hình mới
+    - Install lên điện thoại thật
+    - Mở app và kiểm tra Logcat: "🔥 Firebase Emulator Mode ENABLED"
+    
+    ✅ CÁC CHỨC NĂNG SẼ HOẠT ĐỘNG:
+    - Firestore (đọc/ghi dữ liệu)
+    - Authentication (đăng ký/đăng nhập)
+    - Storage (upload ảnh eKYC)
+    - Cloud Functions (gửi email OTP)
+    - Tất cả chức năng app (chuyển tiền, thanh toán, tìm chi nhánh, etc.)
+    
+    ❌ CÁC CHỨC NĂNG KHÔNG PHỤ THUỘC EMULATOR (vẫn hoạt động bình thường):
+    - Goong Maps (dùng API key thật)
+    - Location Services (GPS điện thoại)
+    - Payment Gateway (VNPay - cần internet thật)
+    
+    📖 Xem chi tiết: HUONG_DAN_KET_NOI_DIEN_THOAI_THAT.md
+
+1.2. SETUP FIREBASE:
+    
+    Bước 1: Tạo Firebase Project
+    - Vào https://console.firebase.google.com
+    - Tạo project mới: "ckl-banking"
+    - Bật Authentication (Email/Password)
+    - Tạo Firestore Database
+    - Bật Firebase Storage
+    - Tạo Cloud Functions
+
+    Bước 2: Cấu hình Android App
+    - Download google-services.json
+    - Đặt vào app/ directory
+    - Package name: com.example.cklbanking
+
+    Bước 3: Setup Firebase Emulator (Tùy chọn - cho local testing)
+    - Cài đặt Firebase CLI: npm install -g firebase-tools
+    - Login: firebase login
+    - Init: firebase init emulators
+    - Chọn: Firestore, Functions, Authentication
+    - Start emulator: firebase emulators:start
+
+1.3. CẤU HÌNH ỨNG DỤNG:
+    
+    File: app/src/main/java/com/example/cklbanking/CKLBankingApplication.java
+    - USE_EMULATOR = true (nếu dùng emulator)
+    - EMULATOR_HOST = "10.0.2.2" (Android Emulator)
+    - Hoặc IP máy tính (Physical Device)
+
+1.4. CẤU HÌNH CLOUD FUNCTIONS:
+    
+    File: functions/index.js
+    - Cấu hình Gmail SMTP:
+      + GMAIL_USER: Email Gmail
+      + GMAIL_PASS: App Password (không phải mật khẩu thường)
+    - Cấu hình VNPay (nếu test payment):
+      + VNPAY_TMN_CODE
+      + VNPAY_SECRET_KEY
+      + VNPAY_URL (sandbox)
+
+    Deploy Functions:
+    cd functions
+    npm install
+    firebase deploy --only functions
+
+================================================================================
+PHẦN 2: TẠO DỮ LIỆU TEST
+================================================================================
+
+2.1. TẠO TÀI KHOẢN TEST:
+
+    A. Tài khoản Customer:
+       Email: customer.test@example.com
+       Password: Test123456!
+       Full Name: Nguyễn Văn A
+       Phone: 0901234567
+       Role: customer
+
+    B. Tài khoản Officer:
+       Email: officer.test@example.com
+       Password: Officer123!
+       Full Name: Trần Thị B
+       Phone: 0907654321
+       Role: officer
+
+2.2. TẠO TÀI KHOẢN NGÂN HÀNG (trong Firestore):
+
+    Collection: accounts
+    Document ID: [auto-generated]
+    {
+      "accountId": "acc_001",
+      "userId": "[customer_user_id]",
+      "accountNumber": "1234567890",
+      "accountType": "checking",
+      "balance": 10000000,
+      "createdAt": [timestamp]
+    }
+
+    Tạo thêm:
+    - Saving account (accountType: "saving", có interestRate, term)
+    - Mortgage account (accountType: "mortgage", có monthlyPayment)
+
+2.3. TẠO CHI NHÁNH (trong Firestore):
+
+    Collection: branches
+    Document ID: [auto-generated]
+    {
+      "branchId": "branch_001",
+      "name": "Chi nhánh Quận 1",
+      "address": "123 Đường ABC, Quận 1, TP.HCM",
+      "latitude": 10.7769,
+      "longitude": 106.7009,
+      "phoneNumber": "0281234567",
+      "openingHours": "8:00 - 17:00",
+      "isOpen": true,
+      "type": "branch"
+    }
+
+================================================================================
+PHẦN 3: TESTING WORKFLOW
+================================================================================
+
+3.1. TEST FLOW CƠ BẢN:
+
+    ┌─────────────┐
+    │   Splash    │
+    └──────┬──────┘
+           │
+           ▼
+    ┌─────────────┐
+    │    Login    │
+    └──────┬──────┘
+           │
+           ▼
+    ┌─────────────┐
+    │  Dashboard  │
+    └──────┬──────┘
+           │
+           ├──► Xem tài khoản
+           ├──► Chuyển tiền
+           ├──► Nạp tiền
+           ├──► Rút tiền
+           ├──► Tiện ích
+           └──► Tìm chi nhánh
+
+3.2. TEST FLOW CHUYỂN TIỀN:
+
+    ┌──────────────┐
+    │ TransferMoney│
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Nhập thông tin│
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Verify (Service)│
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Generate OTP │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Send Email   │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ OTP Screen   │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Verify OTP   │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Complete     │
+    └──────────────┘
+
+================================================================================
+PHẦN 4: TEST CASES CHI TIẾT
+================================================================================
+
+4.1. TEST ĐĂNG NHẬP/ĐĂNG KÝ:
+
+    Test Case 1.1: Đăng ký thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Mở app
+    2. Chọn "Đăng ký"
+    3. Nhập:
+       - Email: newuser@test.com
+       - Password: Test123456!
+       - Confirm Password: Test123456!
+       - Full Name: Lê Văn C
+       - Phone: 0901111111
+    4. Nhấn "Đăng ký"
+    
+    Expected:
+    ✓ Tài khoản được tạo trong Firebase Auth
+    ✓ Document được tạo trong Firestore collection "users"
+    ✓ Role = "customer"
+    ✓ ekycStatus = "pending"
+    ✓ Chuyển đến LoginActivity
+    
+    Actual Result: [Ghi chú kết quả thực tế]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 1.2: Đăng nhập thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Mở app
+    2. Nhập email: customer.test@example.com
+    3. Nhập password: Test123456!
+    4. Nhấn "Đăng nhập"
+    
+    Expected:
+    ✓ Đăng nhập thành công
+    ✓ Lấy role từ Firestore
+    ✓ Nếu role = "customer" → CustomerDashboardActivity
+    ✓ Nếu role = "officer" → OfficerDashboardActivity
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 1.3: Đăng nhập với thông tin sai
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Nhập email: wrong@test.com
+    2. Nhập password: WrongPass123!
+    3. Nhấn "Đăng nhập"
+    
+    Expected:
+    ✓ Hiển thị thông báo lỗi
+    ✓ Không cho phép đăng nhập
+    ✓ Vẫn ở LoginActivity
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.2. TEST QUẢN LÝ TÀI KHOẢN:
+
+    Test Case 2.1: Xem danh sách tài khoản
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Đăng nhập với customer account
+    2. Vào Dashboard
+    3. Xem danh sách tài khoản
+    
+    Expected:
+    ✓ Hiển thị tất cả tài khoản của user
+    ✓ Mỗi tài khoản hiển thị: số tài khoản, loại, số dư
+    ✓ Có thể click vào để xem chi tiết
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 2.2: Xem chi tiết tài khoản Checking
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Click vào một Checking account
+    2. Xem AccountDetailActivity
+    
+    Expected:
+    ✓ Hiển thị số tài khoản
+    ✓ Hiển thị số dư
+    ✓ Hiển thị loại: "Vãng lai"
+    ✓ Có nút: Nạp tiền, Rút tiền, Lịch sử
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 2.3: Xem chi tiết tài khoản Saving
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Click vào một Saving account
+    
+    Expected:
+    ✓ Hiển thị số dư
+    ✓ Hiển thị lãi suất (%/năm)
+    ✓ Hiển thị lợi nhuận/tháng
+    ✓ Hiển thị kỳ hạn
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.3. TEST GIAO DỊCH:
+
+    Test Case 3.1: Chuyển tiền nội bộ thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Chuyển tiền"
+    2. Chọn tài khoản nguồn
+    3. Chọn "Nội bộ"
+    4. Nhập số tài khoản đích: 1234567890
+    5. Nhập số tiền: 500000
+    6. Nhập nội dung: "Test transfer"
+    7. Nhấn "Tiếp tục"
+    8. Kiểm tra email OTP
+    9. Nhập OTP
+    10. Nhấn "Xác nhận"
+    
+    Expected:
+    ✓ TransactionService.verifyTransaction() được gọi
+    ✓ Kiểm tra số dư đủ
+    ✓ Kiểm tra tài khoản đích tồn tại
+    ✓ OTP được generate và gửi email
+    ✓ Sau khi verify OTP:
+      - Transaction được tạo trong Firestore
+      - Số dư tài khoản nguồn giảm
+      - Số dư tài khoản đích tăng
+      - Hiển thị "Giao dịch thành công"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 3.2: Chuyển tiền vượt quá số dư
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Chuyển tiền"
+    2. Chọn tài khoản (số dư: 1,000,000)
+    3. Chọn "Liên ngân hàng"
+    4. Nhập số tiền: 1,000,000
+    5. Kiểm tra: Phí giao dịch = 5,000 VND
+    6. Kiểm tra: Tổng cần = 1,005,000 VND
+    7. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Hiển thị thông báo lỗi chi tiết:
+      "❌ Lỗi: Số dư không đủ để thực hiện giao dịch.
+       Số dư hiện tại: 1,000,000 ₫ | Số tiền cần chuyển: 1,000,000 ₫ | Thiếu: 5,000 ₫.
+       Vui lòng nạp thêm tiền vào tài khoản."
+    ✓ Không gửi OTP
+    ✓ Không tạo transaction
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 3.2b: Validation tên người nhận (liên ngân hàng)
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Chuyển tiền" → Chọn "Liên ngân hàng"
+    2. Chọn ngân hàng: "Techcombank"
+    3. Nhập số tài khoản: 1234567890
+    4. Để trống tên người nhận
+    5. Nhập số tiền: 500,000
+    6. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Hiển thị Toast: "Tên người nhận không được để trống"
+    ✓ Không cho phép tiếp tục
+    
+    Steps tiếp theo:
+    7. Nhập tên có số: "Nguyễn Văn 123"
+    8. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Hiển thị Toast: "Tên người nhận không được chứa số"
+    ✓ Không cho phép tiếp tục
+    
+    Steps tiếp theo:
+    9. Nhập tên hợp lệ: "Nguyễn Văn B"
+    10. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Validation pass
+    ✓ Tiếp tục đến OTP screen
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 3.2c: Validation ngân hàng (liên ngân hàng)
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Chuyển tiền" → Chọn "Liên ngân hàng"
+    2. Không chọn ngân hàng
+    3. Nhập số tài khoản và số tiền
+    4. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Hiển thị error: "Vui lòng chọn ngân hàng"
+    ✓ Focus vào dropdown ngân hàng
+    ✓ Không cho phép tiếp tục
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 3.3: Chuyển tiền vượt giới hạn trong ngày
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Tạo nhiều giao dịch trong ngày (tổng > 50,000,000)
+    2. Thực hiện giao dịch tiếp theo
+    
+    Expected:
+    ✓ TransactionService kiểm tra daily limit
+    ✓ Hiển thị thông báo chi tiết:
+      "❌ Lỗi: Vượt quá giới hạn chuyển tiền trong ngày.
+       Đã chuyển hôm nay: 50,000,000 ₫ / 50,000,000 ₫ (Giới hạn).
+       Số tiền còn lại có thể chuyển: 0 ₫.
+       Giao dịch này sẽ làm vượt quá giới hạn. Vui lòng thử lại vào ngày mai."
+    ✓ Không cho phép giao dịch
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 3.4: Giao dịch lớn yêu cầu eKYC
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Đăng nhập với account chưa eKYC (ekycStatus = "pending")
+    2. Vào "Chuyển tiền"
+    3. Nhập số tiền: 15,000,000 (≥ 10,000,000)
+    4. Kiểm tra: Card "Giao dịch lớn yêu cầu eKYC" hiển thị
+    5. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ Hiển thị thông báo:
+      "⚠️ Giao dịch giá trị cao yêu cầu xác thực eKYC.
+       Số tiền giao dịch: 15,000,000 ₫ (≥ 10,000,000 ₫).
+       Trạng thái eKYC hiện tại: Đang chờ xác thực (vui lòng đợi phê duyệt).
+       Vui lòng hoàn thành xác thực eKYC trước khi thực hiện giao dịch này."
+    ✓ Chuyển đến EKYCActivity
+    ✓ Sau khi eKYC verified, có thể quay lại và thực hiện giao dịch
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.4. TEST OTP:
+
+    Test Case 4.1: Gửi OTP thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Thực hiện giao dịch chuyển tiền
+    2. Nhấn "Tiếp tục"
+    
+    Expected:
+    ✓ OTPService.generateOTP() được gọi
+    ✓ OTP được lưu vào Firestore collection "otps"
+    ✓ Email request được tạo trong "email_requests"
+    ✓ Cloud Function sendOTPEmail được trigger
+    ✓ Email OTP được gửi đến email đăng ký
+    ✓ Chuyển đến OTPVerificationActivity
+    
+    Check Logcat:
+    - Tìm "OTP CODE FOR TESTING: [6 digits]"
+    - Hoặc kiểm tra email inbox
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 4.2: Xác thực OTP thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Sau khi nhận OTP (từ test case 4.1)
+    2. Nhập mã OTP đúng (6 chữ số)
+    3. Nhấn "Xác nhận"
+    
+    Expected:
+    ✓ OTPService.verifyOTP() được gọi
+    ✓ Kiểm tra account lock (nếu bị khóa thì không cho verify)
+    ✓ OTP được verify thành công
+    ✓ OTP được đánh dấu "isUsed = true"
+    ✓ failedAttempts được reset về 0 (nếu có)
+    ✓ Giao dịch được hoàn tất
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 4.3: Xác thực OTP sai (3 lần → lock account)
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Nhập mã OTP sai lần 1: 000000
+    2. Nhấn "Xác nhận"
+    
+    Expected:
+    ✓ Hiển thị: "Mã OTP không đúng (Còn 2 lần thử)"
+    ✓ failedAttempts = 1
+    ✓ Cho phép nhập lại
+    
+    Steps tiếp theo:
+    3. Nhập OTP sai lần 2: 111111
+    4. Nhấn "Xác nhận"
+    
+    Expected:
+    ✓ Hiển thị: "Mã OTP không đúng (Còn 1 lần thử)"
+    ✓ failedAttempts = 2
+    
+    Steps tiếp theo:
+    5. Nhập OTP sai lần 3: 222222
+    6. Nhấn "Xác nhận"
+    
+    Expected:
+    ✓ Hiển thị: "Bạn đã nhập sai OTP 3 lần. Tài khoản đã bị khóa trong 15 phút."
+    ✓ Account bị lock (lockedUntil = currentTime + 15 phút)
+    ✓ OTP input bị disable
+    ✓ Không cho phép verify OTP trong 15 phút
+    
+    Steps tiếp theo:
+    7. Đợi 15 phút (hoặc sửa lockedUntil trong Firestore)
+    8. Thử verify OTP lại
+    
+    Expected:
+    ✓ Account tự động unlock
+    ✓ Có thể verify OTP lại
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 4.4: OTP hết hạn với countdown timer
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Nhận OTP
+    2. Xem countdown timer (bắt đầu từ 02:00)
+    3. Quan sát màu sắc timer:
+       - > 1 phút: Màu xanh lá
+       - 30s - 1 phút: Màu cam
+       - < 30s: Màu đỏ
+    4. Đợi hơn 2 phút
+    5. Nhập OTP
+    
+    Expected:
+    ✓ Timer đếm ngược từ 02:00 → 00:00
+    ✓ Màu sắc thay đổi theo thời gian
+    ✓ Khi hết hạn: Hiển thị "00:00" màu đỏ
+    ✓ Hiển thị "Mã OTP đã hết hạn. Vui lòng gửi lại mã mới."
+    ✓ Nút "Gửi lại" được enable
+    ✓ Nút "Xác nhận" bị disable
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.5. TEST EKYC:
+
+    Test Case 5.1: Thực hiện eKYC thành công
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Đăng nhập với customer account
+    2. Vào "Xác thực danh tính" (eKYC)
+    3. Cho phép quyền Camera
+    4. Chụp ảnh khuôn mặt
+    5. Xác nhận
+    
+    Expected:
+    ✓ Camera mở thành công
+    ✓ Ảnh được chụp
+    ✓ ML Kit Face Detection phát hiện khuôn mặt
+    ✓ Ảnh được upload lên Firebase Storage
+     ✓ URL được lưu vào User.faceImageUrl
+     ✓ ekycStatus được cập nhật thành "verified"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.6. TEST TIỆN ÍCH:
+
+    Test Case 6.1: Thanh toán hóa đơn điện (với eKYC cho giao dịch lớn)
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tiện ích"
+    2. Chọn "Thanh toán hóa đơn điện"
+    3. Xem danh sách hóa đơn chưa thanh toán (BillListActivity)
+    4. Click vào một hóa đơn
+    5. Kiểm tra: Thông tin tự động điền (mã khách hàng, số tiền)
+    6. Chọn tài khoản thanh toán
+    7. Nhấn "Thanh toán"
+    
+    Expected (nếu số tiền < 10,000,000):
+    ✓ Chuyển đến OTP screen
+    ✓ Nhập OTP và xác nhận
+    ✓ Bill được đánh dấu "paid" trong Firestore
+    ✓ Số dư tài khoản giảm
+    ✓ Hiển thị "Thanh toán thành công"
+    
+    Expected (nếu số tiền ≥ 10,000,000):
+    ✓ Kiểm tra eKYC requirement
+    ✓ Nếu chưa eKYC: Chuyển đến EKYCActivity
+    ✓ Sau khi eKYC verified: Quay lại và tiếp tục thanh toán
+    ✓ Sau đó: OTP → Thanh toán thành công
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 6.1b: Tạo hóa đơn mock để test
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Sử dụng MockBillService để tạo hóa đơn test
+    2. Hoặc tạo manual trong Firestore:
+       Collection: bills
+       {
+         "billId": "bill_001",
+         "userId": "[user_id]",
+         "customerCode": "KH123456",
+         "billType": "electricity",
+         "provider": "EVN",
+         "amount": 500000,
+         "dueDate": [timestamp],
+         "status": "unpaid",
+         "description": "Hóa đơn điện tháng 12/2024"
+       }
+    3. Quay lại app và test thanh toán
+    
+    Expected:
+    ✓ Hóa đơn hiển thị trong danh sách
+    ✓ Có thể click và thanh toán
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 6.2: Nạp tiền điện thoại
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tiện ích" → "Nạp tiền điện thoại"
+    2. Chọn nhà mạng (Viettel)
+    3. Nhập số điện thoại: 0901234567
+    4. Nhập số tiền: 50000
+    5. Chọn tài khoản thanh toán
+    6. Nhấn "Nạp tiền"
+    7. Xác thực OTP
+    
+    Expected:
+    ✓ UtilityPayment được tạo với utilityType = "phone_recharge"
+     ✓ Số dư giảm
+     ✓ Hiển thị "Nạp tiền thành công"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.7. TEST TÌM CHI NHÁNH:
+
+    Test Case 7.1: Hiển thị bản đồ và chi nhánh với khoảng cách
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tìm chi nhánh"
+    2. Cho phép quyền Location
+    
+    Expected:
+    ✓ Bản đồ hiển thị (Goong Maps)
+    ✓ Vị trí hiện tại được đánh dấu (màu xanh)
+    ✓ Các chi nhánh được hiển thị bằng markers
+    ✓ Danh sách chi nhánh hiển thị bên dưới
+    ✓ Mỗi chi nhánh hiển thị:
+       - Tên chi nhánh
+       - Địa chỉ
+       - Khoảng cách (m hoặc km)
+       - Loại (Chi nhánh/ATM)
+       - Trạng thái (Đang mở/Đã đóng)
+       - Icon yêu thích (nếu đã lưu)
+    ✓ Danh sách được sắp xếp theo khoảng cách (gần nhất trước)
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.2: Filter theo khoảng cách
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tìm chi nhánh"
+    2. Chọn filter "≤ 1 km"
+    
+    Expected:
+    ✓ Chỉ hiển thị chi nhánh trong vòng 1km
+    ✓ Danh sách được cập nhật
+    ✓ Map chỉ hiển thị markers của chi nhánh được filter
+    
+    Steps tiếp theo:
+    3. Chọn "≤ 5 km"
+    4. Chọn "≤ 10 km"
+    5. Chọn "Tất cả"
+    
+    Expected:
+    ✓ Filter hoạt động đúng cho mỗi option
+    ✓ Danh sách và map được cập nhật real-time
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.3: Filter theo loại (Chi nhánh/ATM)
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tìm chi nhánh"
+    2. Chọn filter "Chi nhánh"
+    
+    Expected:
+    ✓ Chỉ hiển thị chi nhánh (type = "branch")
+    ✓ Ẩn các ATM
+    
+    Steps tiếp theo:
+    3. Chọn "ATM"
+    4. Chọn "Tất cả"
+    
+    Expected:
+    ✓ Filter hoạt động đúng
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.4: Filter "Chỉ mở cửa"
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào "Tìm chi nhánh"
+    2. Bật toggle "Chỉ mở cửa"
+    
+    Expected:
+    ✓ Chỉ hiển thị chi nhánh đang mở cửa
+    ✓ Ẩn các chi nhánh đã đóng
+    ✓ Tính toán trạng thái mở/đóng dựa trên openingHours và thời gian hiện tại
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.5: Xem chi tiết chi nhánh
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Click vào một chi nhánh trong danh sách
+    2. Xem BranchDetailActivity
+    
+    Expected:
+    ✓ Hiển thị đầy đủ thông tin:
+       - Tên chi nhánh
+       - Địa chỉ
+       - Số điện thoại
+       - Giờ mở cửa
+       - Trạng thái (Đang mở/Đã đóng)
+       - Khoảng cách
+       - Danh sách dịch vụ (Chips)
+       - Hình ảnh (nếu có)
+    ✓ Có nút "Gọi điện" (mở dialer)
+    ✓ Có nút "Chỉ đường" (vẽ route trên map)
+    ✓ Có FAB "Yêu thích" (toggle favorite)
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.6: Lưu chi nhánh yêu thích
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Vào chi tiết một chi nhánh
+    2. Nhấn nút "Yêu thích" (FAB)
+    
+    Expected:
+    ✓ Chi nhánh được lưu vào Firestore collection "favorite_branches"
+    ✓ Icon yêu thích hiển thị trong danh sách
+    ✓ FAB đổi màu/icon khi đã favorite
+    
+    Steps tiếp theo:
+    3. Nhấn lại nút "Yêu thích"
+    
+    Expected:
+    ✓ Chi nhánh bị xóa khỏi favorites
+    ✓ Icon yêu thích biến mất
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 7.7: Tìm đường đến chi nhánh
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Click vào một chi nhánh
+    2. Nhấn "Chỉ đường"
+    
+    Expected:
+    ✓ Đường đi được vẽ trên bản đồ (màu xanh)
+    ✓ Hiển thị khoảng cách (m hoặc km)
+    ✓ Hiển thị thời gian ước tính (phút)
+    ✓ Toast hiển thị: "Khoảng cách: X km | Thời gian: Y phút"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+4.8. TEST CHỨC NĂNG NHÂN VIÊN:
+
+    Test Case 8.1: Tạo tài khoản cho khách hàng
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Đăng nhập với officer account
+    2. Vào "Tạo tài khoản"
+    3. Nhập thông tin khách hàng
+    4. Nhấn "Tạo tài khoản"
+    
+    Expected:
+    ✓ Account được tạo trong Firestore
+     ✓ AccountRepository.createAccount() được gọi
+     ✓ Hiển thị "Tạo tài khoản thành công"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+    Test Case 8.2: Quản lý lãi suất
+    ─────────────────────────────────────────────────────────────
+    Steps:
+    1. Đăng nhập với officer account
+    2. Vào "Quản lý lãi suất"
+    3. Chọn loại: "Saving"
+    4. Cập nhật lãi suất: 6.5%
+    5. Nhấn "Lưu"
+    
+    Expected:
+    ✓ AccountRepository.updateInterestRate() được gọi
+     ✓ Tất cả Saving accounts được cập nhật lãi suất
+     ✓ Hiển thị "Cập nhật thành công"
+    
+    Actual Result: [Ghi chú]
+    ─────────────────────────────────────────────────────────────
+
+================================================================================
+PHẦN 5: TESTING TOOLS VÀ DEBUGGING
+================================================================================
+
+5.1. LOGGING:
+
+    Sử dụng Log.d(), Log.e() để debug:
+    
+    - TransactionService: TAG = "TransactionService"
+    - OTPService: TAG = "OTPService"
+    - PaymentService: TAG = "PaymentService"
+    
+    Xem logs trong Logcat:
+    - Filter by TAG
+    - Filter by package: com.example.cklbanking
+
+5.2. FIREBASE CONSOLE:
+
+    - Firebase Console → Firestore: Xem dữ liệu real-time
+    - Firebase Console → Authentication: Xem users
+    - Firebase Console → Functions: Xem logs
+    - Firebase Console → Storage: Xem ảnh eKYC
+
+5.3. FIREBASE EMULATOR UI:
+
+    Nếu dùng emulator:
+    - Firestore UI: http://localhost:4000/firestore
+    - Functions Logs: http://localhost:4000/logs
+    - Authentication: http://localhost:4000/auth
+
+5.4. TESTING EMAIL:
+
+    - Kiểm tra email inbox để nhận OTP
+    - Hoặc xem Logcat: "OTP CODE FOR TESTING: [code]"
+    - Hoặc kiểm tra Firestore collection "otps"
+
+5.5. TESTING PAYMENT:
+
+    VNPay Sandbox:
+    - Sử dụng test credentials
+    - Test với số tiền nhỏ
+    - Kiểm tra callback URL
+
+================================================================================
+PHẦN 6: CHECKLIST TESTING
+================================================================================
+
+6.1. FUNCTIONAL TESTING:
+    [ ] Đăng ký/Đăng nhập
+    [ ] Quản lý tài khoản (Checking, Saving, Mortgage)
+    [ ] Chuyển tiền nội bộ (miễn phí)
+    [ ] Chuyển tiền liên ngân hàng (có phí)
+    [ ] Validation recipient name (liên ngân hàng)
+    [ ] Validation bank selection
+    [ ] Transaction fee calculation và hiển thị
+    [ ] Nạp tiền/Rút tiền
+    [ ] OTP verification với rate limiting
+    [ ] OTP account lock (3 lần sai → lock 15 phút)
+    [ ] OTP countdown timer với màu sắc
+    [ ] eKYC cho giao dịch lớn (≥ 10,000,000)
+    [ ] Face verification khi giao dịch lớn
+    [ ] Thanh toán tiện ích (hóa đơn điện/nước)
+    [ ] Tìm chi nhánh với filter (khoảng cách, loại, mở cửa)
+    [ ] Chi tiết chi nhánh và lưu yêu thích
+    [ ] Chức năng nhân viên
+
+6.2. SECURITY TESTING:
+    [ ] Authentication
+    [ ] Authorization (Customer vs Officer)
+    [ ] OTP expiry (2 phút)
+    [ ] OTP rate limiting (5 lần/giờ)
+    [ ] OTP account lock (3 lần sai → 15 phút)
+    [ ] Transaction limits (daily limit, single transaction limit)
+    [ ] Input validation (recipient name, bank selection, account number)
+    [ ] eKYC requirement cho giao dịch lớn
+    [ ] Face verification
+    [ ] Error messages không tiết lộ thông tin nhạy cảm
+
+6.3. PERFORMANCE TESTING:
+    [ ] Load danh sách lớn (100+ transactions)
+    [ ] Network timeout handling
+    [ ] Image loading performance
+
+6.4. UI/UX TESTING:
+    [ ] Loading states
+    [ ] Error messages
+    [ ] Empty states
+    [ ] Navigation flow
+
+6.5. INTEGRATION TESTING:
+    [ ] Firebase integration
+    [ ] Cloud Functions
+    [ ] Payment gateway (VNPay)
+    [ ] Maps integration
+
+================================================================================
+PHẦN 7: CÁC LỖI THƯỜNG GẶP VÀ CÁCH XỬ LÝ
+================================================================================
+
+7.1. LỖI: "Firebase App not initialized"
+    Giải pháp:
+    - Kiểm tra google-services.json có đúng package name không
+    - Kiểm tra CKLBankingApplication có được khai báo trong AndroidManifest.xml
+
+7.2. LỖI: "OTP email không được gửi"
+    Giải pháp:
+    - Kiểm tra Cloud Functions đã deploy chưa
+    - Kiểm tra Gmail credentials trong functions/index.js
+    - Kiểm tra Firestore collection "email_requests" có document mới không
+    - Xem Functions logs trong Firebase Console
+
+7.3. LỖI: "Transaction verification failed"
+    Giải pháp:
+    - Kiểm tra số dư tài khoản
+    - Kiểm tra tài khoản đích có tồn tại không
+    - Kiểm tra daily limit
+    - Xem Logcat để biết lỗi cụ thể
+
+7.4. LỖI: "Maps không hiển thị"
+    Giải pháp:
+    - Kiểm tra Goong Maps API key trong strings.xml
+    - Kiểm tra quyền INTERNET và LOCATION
+    - Kiểm tra network connection
+
+7.5. LỖI: "Firebase Emulator không kết nối"
+    Giải pháp:
+    - Kiểm tra USE_EMULATOR = true
+    - Kiểm tra EMULATOR_HOST đúng chưa
+    - Kiểm tra emulator đang chạy: firebase emulators:start
+
+================================================================================
+PHẦN 8: TESTING REPORT TEMPLATE
+================================================================================
+
+TESTING REPORT - CKL BANKING
+────────────────────────────────────────────────────────────────────────────
+Date: [Ngày test]
+Tester: [Tên người test]
+Version: 1.0
+Device: [Tên thiết bị/Emulator]
+
+SUMMARY:
+- Total Test Cases: [Số]
+- Passed: [Số]
+- Failed: [Số]
+- Not Tested: [Số]
+- Pass Rate: [%]
+
+DETAILED RESULTS:
+[Liệt kê từng test case và kết quả]
+
+CRITICAL ISSUES:
+[Liệt kê các lỗi nghiêm trọng]
+
+RECOMMENDATIONS:
+[Đề xuất cải thiện]
+
+================================================================================
+                    KẾT THÚC HƯỚNG DẪN TESTING
+================================================================================
+
+
