@@ -82,11 +82,205 @@ PHẦN 1: CHUẨN BỊ MÔI TRƯỜNG TESTING
     - Package name: com.example.cklbanking
 
     Bước 3: Setup Firebase Emulator (Tùy chọn - cho local testing)
-    - Cài đặt Firebase CLI: npm install -g firebase-tools
-    - Login: firebase login
-    - Init: firebase init emulators
-    - Chọn: Firestore, Functions, Authentication
-    - Start emulator: firebase emulators:start
+    
+    CÓ 2 CÁCH CHẠY FIREBASE EMULATOR:
+    
+    ════════════════════════════════════════════════════════════════════════════
+    CÁCH 1: CHẠY BẰNG DOCKER (KHUYẾN NGHỊ) 🐳
+    ════════════════════════════════════════════════════════════════════════════
+    
+    Ưu điểm:
+    - Dễ setup, không cần cài đặt Node.js/Firebase CLI trên máy
+    - Môi trường cách ly, không ảnh hưởng hệ thống
+    - Dễ dàng chia sẻ với team
+    - Tự động khởi động lại khi có thay đổi
+    
+    Yêu cầu:
+    - Docker Desktop đã cài đặt và đang chạy
+    - Docker Compose (thường đi kèm Docker Desktop)
+    
+    Các bước:
+    
+    1. Kiểm tra Docker đã cài đặt:
+       - Windows: Mở Docker Desktop → Kiểm tra status "Running"
+       - Kiểm tra: docker --version
+       - Kiểm tra: docker-compose --version
+    
+    2. Tạo file docker-compose.yml (nếu chưa có):
+       Tạo file docker-compose.yml ở thư mục gốc project với nội dung:
+       
+       version: '3.8'
+       services:
+         firebase-emulator:
+           image: ghcr.io/firebase/firebase-tools:latest
+           container_name: ckl-banking-emulator
+           ports:
+             - "4000:4000"   # Emulator UI
+             - "8080:8080"   # Firestore
+             - "5001:5001"   # Functions
+             - "9099:9099"   # Authentication
+             - "9000:9000"   # Storage
+           volumes:
+             - ./firebase.json:/firebase.json
+             - ./firebase-debug.log:/firebase-debug.log
+             - ./emulator-data:/root/.cache/firebase/emulators
+             - ./functions:/functions
+           working_dir: /workspace
+           command: emulators:start --project=ckl-banking-demo
+    
+    3. Tạo file firebase.json (nếu chưa có):
+       Tạo file firebase.json ở thư mục gốc với nội dung:
+       
+       {
+         "emulators": {
+           "auth": {
+             "port": 9099
+           },
+           "firestore": {
+             "port": 8080
+           },
+           "functions": {
+             "port": 5001
+           },
+           "storage": {
+             "port": 9000
+           },
+           "ui": {
+             "enabled": true,
+             "port": 4000
+           }
+         }
+       }
+    
+    4. Khởi động Emulator bằng Docker:
+       - Mở Terminal/PowerShell ở thư mục gốc project
+       - Chạy lệnh: docker-compose up
+       - Hoặc chạy nền: docker-compose up -d
+       - Đợi đến khi thấy: "All emulators ready!"
+    
+    5. Kiểm tra Emulator đang chạy:
+       - Mở trình duyệt: http://localhost:4000
+       - Bạn sẽ thấy Firebase Emulator UI
+       - Có thể xem Firestore, Authentication, Functions, Storage
+    
+    6. Dừng Emulator:
+       - Nhấn Ctrl+C trong terminal
+       - Hoặc: docker-compose down
+    
+    7. Xem logs:
+       - docker-compose logs -f
+    
+    8. Xóa data và khởi động lại:
+       - docker-compose down -v
+       - docker-compose up
+    
+    ════════════════════════════════════════════════════════════════════════════
+    CÁCH 2: CHẠY BẰNG FIREBASE CLI (TRUYỀN THỐNG)
+    ════════════════════════════════════════════════════════════════════════════
+    
+    Yêu cầu:
+    - Node.js đã cài đặt (version 14+)
+    - npm hoặc yarn
+    
+    Các bước:
+    
+    1. Cài đặt Firebase CLI:
+       npm install -g firebase-tools
+       # Hoặc: yarn global add firebase-tools
+    
+    2. Login vào Firebase:
+       firebase login
+       # Mở trình duyệt để xác thực
+    
+    3. Khởi tạo Emulator (nếu chưa có):
+       firebase init emulators
+       # Chọn các emulator cần dùng:
+       # ✓ Firestore
+       # ✓ Functions
+       # ✓ Authentication
+       # ✓ Storage (tùy chọn)
+    
+    4. Cấu hình firebase.json:
+       File firebase.json sẽ được tạo tự động với cấu hình emulator
+    
+    5. Khởi động Emulator:
+       firebase emulators:start
+       # Hoặc chỉ chạy một số emulator:
+       # firebase emulators:start --only firestore,functions
+    
+    6. Kiểm tra:
+       - Mở: http://localhost:4000
+       - Xem logs trong terminal
+    
+    7. Dừng Emulator:
+       - Nhấn Ctrl+C
+    
+    ════════════════════════════════════════════════════════════════════════════
+    SO SÁNH 2 CÁCH:
+    ════════════════════════════════════════════════════════════════════════════
+    
+    Docker:
+    ✓ Không cần cài Node.js/Firebase CLI
+    ✓ Môi trường cách ly
+    ✓ Dễ chia sẻ với team
+    ✗ Cần Docker Desktop (chiếm tài nguyên)
+    
+    Firebase CLI:
+    ✓ Nhẹ hơn, không cần Docker
+    ✓ Dễ debug hơn
+    ✗ Cần cài Node.js và Firebase CLI
+    ✗ Có thể xung đột với các project khác
+    
+    ════════════════════════════════════════════════════════════════════════════
+    LƯU Ý QUAN TRỌNG:
+    ════════════════════════════════════════════════════════════════════════════
+    
+    1. Ports phải khả dụng:
+       - 4000: Emulator UI
+       - 8080: Firestore
+       - 5001: Functions
+       - 9099: Authentication
+       - 9000: Storage
+       Nếu port bị chiếm, thay đổi trong firebase.json
+    
+    2. Data persistence:
+       - Docker: Data lưu trong volume ./emulator-data
+       - Firebase CLI: Data lưu trong thư mục .firebase/
+       - Để reset data: Xóa thư mục này và khởi động lại
+    
+    3. Kết nối từ app:
+       - Android Emulator: EMULATOR_HOST = "10.0.2.2"
+       - Physical Device: EMULATOR_HOST = "IP máy tính" (ví dụ: "192.168.1.100")
+       - Xem phần 1.1b để biết cách kết nối từ điện thoại thật
+    
+    4. Functions code:
+       - Đảm bảo functions/ đã có code
+       - Nếu chưa có, tạo: firebase init functions
+       - Hoặc copy từ project khác
+    
+    ════════════════════════════════════════════════════════════════════════════
+    TROUBLESHOOTING:
+    ════════════════════════════════════════════════════════════════════════════
+    
+    Lỗi: "Port already in use"
+    → Kiểm tra port đang được sử dụng:
+      Windows: netstat -ano | findstr :8080
+      Mac/Linux: lsof -i :8080
+    → Thay đổi port trong firebase.json hoặc dừng process đang dùng port
+    
+    Lỗi: "Cannot connect to emulator"
+    → Kiểm tra emulator đang chạy: http://localhost:4000
+    → Kiểm tra USE_EMULATOR = true trong CKLBankingApplication.java
+    → Kiểm tra EMULATOR_HOST đúng (10.0.2.2 cho emulator, IP máy cho device)
+    
+    Lỗi: "Functions not found"
+    → Kiểm tra functions/ có code chưa
+    → Kiểm tra firebase.json có cấu hình functions chưa
+    → Xem logs: docker-compose logs hoặc terminal
+    
+    Lỗi: "Docker daemon not running"
+    → Khởi động Docker Desktop
+    → Đợi Docker khởi động hoàn toàn (icon Docker ở system tray)
 
 1.3. CẤU HÌNH ỨNG DỤNG:
     
