@@ -1,0 +1,132 @@
+================================================================================
+PHẦN 1: YÊU CẦU 1 - USER PROFILES (Hồ sơ người dùng)
+================================================================================
+
+Mức độ hoàn thành: 95%
+
+────────────────────────────────────────────────────────────────────────────
+1.1. CẢI THIỆN UX - Phân biệt permissions rõ ràng hơn
+────────────────────────────────────────────────────────────────────────────
+[ ] Thêm visual indicators cho permissions khác nhau
+    - Hiển thị badge "Officer" hoặc "Customer" trên profile
+    - Disable/grey out các chức năng không có quyền
+    - Thêm tooltip giải thích permissions
+
+File cần sửa:
+- CustomerDashboardActivity.java
+- OfficerDashboardActivity.java
+- CustomerProfileActivity.java
+
+────────────────────────────────────────────────────────────────────────────
+1.2. THÊM AUDIT LOG cho việc officers chỉnh sửa customer data
+────────────────────────────────────────────────────────────────────────────
+[ ] Tạo collection "audit_logs" trong Firestore
+[ ] Tạo model AuditLog với các fields:
+    - userId (officer)
+    - customerId
+    - action (create, update, delete)
+    - fieldChanged
+    - oldValue
+    - newValue
+    - timestamp
+[ ] Thêm logic log trong EditCustomerDataActivity
+[ ] Tạo màn hình xem audit logs (cho officers/admin)
+
+File cần tạo:
+- models/AuditLog.java
+- repositories/AuditLogRepository.java
+- activities/AuditLogActivity.java (optional)
+
+File cần sửa:
+- EditCustomerDataActivity.java
+- CreateAccountActivity.java
+
+================================================================================
+PHẦN 7: BẢO MẬT VÀ SECURITY RULES
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+7.1. FIRESTORE SECURITY RULES ⚠ QUAN TRỌNG
+────────────────────────────────────────────────────────────────────────────
+[ ] Tạo file firestore.rules:
+
+[ ] Deploy Security Rules:
+    firebase deploy --only firestore:rules
+
+File cần tạo:
+- firestore.rules
+
+────────────────────────────────────────────────────────────────────────────
+7.2. CẢI THIỆN BẢO MẬT
+────────────────────────────────────────────────────────────────────────────
+[ ] Di chuyển credentials ra Firebase Config:
+    - Gmail credentials
+    - VNPay credentials
+    - Goong Maps API key
+    
+    firebase functions:config:set email.gmail_user="xxx"
+    firebase functions:config:set email.gmail_pass="xxx"
+    firebase functions:config:set vnpay.tmn_code="xxx"
+    firebase functions:config:set vnpay.secret_key="xxx"
+
+[ ] Thêm input validation:
+    - Validate email format
+    - Validate phone number format
+    - Validate account number format
+    - Sanitize user inputs
+
+[ ] Thêm rate limiting:
+    - Giới hạn số lần đăng nhập sai
+    - Giới hạn số lần gửi OTP
+    - Giới hạn số lần thực hiện giao dịch
+
+[ ] Thêm logging cho security events:
+    - Log đăng nhập
+    - Log giao dịch lớn
+    - Log thay đổi permissions
+    - Log failed authentication attempts
+
+File cần sửa:
+- functions/index.js (dùng functions.config())
+- activities/LoginActivity.java (thêm rate limiting)
+- services/OTPService.java (thêm rate limiting)
+
+================================================================================
+PHẦN 9: PERFORMANCE VÀ TỐI ƯU
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+9.2. CACHING VÀ OFFLINE SUPPORT
+────────────────────────────────────────────────────────────────────────────
+[ ] Enable Firestore offline persistence:
+    - Đã có trong CKLBankingApplication (cần kiểm tra)
+    - Test offline mode
+
+[ ] Cache user data:
+    - Cache User object sau khi login
+    - Cache account list
+    - Invalidate cache khi có thay đổi
+
+[ ] Image caching:
+    - Cache ảnh eKYC
+    - Sử dụng Glide hoặc Picasso
+
+File cần sửa:
+- CKLBankingApplication.java (enable persistence)
+- activities/CustomerDashboardActivity.java (cache)
+
+────────────────────────────────────────────────────────────────────────────
+9.3. TỐI ƯU IMAGE LOADING
+────────────────────────────────────────────────────────────────────────────
+[ ] Compress ảnh trước khi upload:
+    - Compress ảnh eKYC
+    - Giảm kích thước file
+    - Giữ chất lượng đủ để nhận diện
+
+[ ] Resize ảnh:
+    - Resize về kích thước hợp lý (ví dụ: 800x800)
+    - Không upload ảnh quá lớn
+
+File cần sửa:
+- activities/EKYCActivity.java
+- activities/OfficerEKYCSupportActivity.java

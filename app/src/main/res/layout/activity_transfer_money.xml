@@ -340,6 +340,57 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- eKYC Info Card (shown for high-value transactions) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/ekycInfoCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@color/warning"
+                android:alpha="0.9"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:src="@drawable/ic_verified"
+                        app:tint="@color/white"
+                        android:layout_marginEnd="12dp"/>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Giao dịch lớn yêu cầu eKYC"
+                            android:textColor="@color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Giao dịch từ 10.000.000 ₫ trở lên cần xác thực eKYC"
+                            android:textColor="@color/white"
+                            android:textSize="12sp"
+                            android:layout_marginTop="4dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Message -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/layoutMessage"

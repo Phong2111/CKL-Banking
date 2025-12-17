@@ -1,5 +1,6 @@
 package com.example.cklbanking.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -16,8 +17,10 @@ import com.example.cklbanking.models.Account;
 import com.example.cklbanking.models.Transaction;
 import com.example.cklbanking.models.UtilityPayment;
 import com.example.cklbanking.repositories.AccountRepository;
+import com.example.cklbanking.repositories.BillRepository;
 import com.example.cklbanking.repositories.TransactionRepository;
 import com.example.cklbanking.repositories.UtilityRepository;
+import com.example.cklbanking.services.TransactionService;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
@@ -47,10 +50,20 @@ public class BillPaymentActivity extends AppCompatActivity {
     private AccountRepository accountRepository;
     private TransactionRepository transactionRepository;
     private UtilityRepository utilityRepository;
+    private BillRepository billRepository;
+    private TransactionService transactionService;
 
     private List<Account> accounts;
     private Account selectedAccount;
     private String selectedBillType;
+    
+    // Bill info from Intent (if coming from BillListActivity)
+    private String billId;
+    private String customerCodeFromBill;
+    private double amountFromBill;
+    private String billTypeFromBill;
+    private String providerFromBill;
+    private String userId;
 
     private static final String[] BILL_TYPES = {"Tiền điện", "Tiền nước"};
 
@@ -64,20 +77,52 @@ public class BillPaymentActivity extends AppCompatActivity {
         accountRepository = new AccountRepository();
         transactionRepository = new TransactionRepository();
         utilityRepository = new UtilityRepository();
+        billRepository = new BillRepository();
+        transactionService = new TransactionService();
+        
+        userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
 
         initViews();
         setupToolbar();
         setupBillTypeSpinner();
         setupListeners();
         loadAccounts();
-
-        // Check if bill type is passed from intent
-        String billTypeFromIntent = getIntent().getStringExtra("bill_type");
-        if (billTypeFromIntent != null) {
-            if (billTypeFromIntent.equals("electricity")) {
-                spinnerBillType.setSelection(0);
-            } else if (billTypeFromIntent.equals("water")) {
-                spinnerBillType.setSelection(1);
+        
+        // Check if coming from BillListActivity with bill info
+        Intent intent = getIntent();
+        billId = intent.getStringExtra("bill_id");
+        customerCodeFromBill = intent.getStringExtra("customer_code");
+        amountFromBill = intent.getDoubleExtra("amount", 0);
+        billTypeFromBill = intent.getStringExtra("bill_type");
+        providerFromBill = intent.getStringExtra("provider");
+        
+        if (billId != null && !billId.isEmpty()) {
+            // Pre-fill form with bill info
+            if (customerCodeFromBill != null) {
+                editCustomerCode.setText(customerCodeFromBill);
+                editCustomerCode.setEnabled(false); // Disable editing
+            }
+            if (amountFromBill > 0) {
+                editAmount.setText(String.valueOf((long)amountFromBill));
+                editAmount.setEnabled(false); // Disable editing
+            }
+            if (billTypeFromBill != null) {
+                if (billTypeFromBill.equals("electricity")) {
+                    spinnerBillType.setSelection(0);
+                } else if (billTypeFromBill.equals("water")) {
+                    spinnerBillType.setSelection(1);
+                }
+                spinnerBillType.setEnabled(false); // Disable editing
+            }
+        } else {
+            // Check if bill type is passed from intent (from UtilitiesActivity)
+            String billTypeFromIntent = intent.getStringExtra("bill_type");
+            if (billTypeFromIntent != null) {
+                if (billTypeFromIntent.equals("electricity")) {
+                    spinnerBillType.setSelection(0);
+                } else if (billTypeFromIntent.equals("water")) {
+                    spinnerBillType.setSelection(1);
+                }
             }
         }
     }
@@ -252,7 +297,69 @@ public class BillPaymentActivity extends AppCompatActivity {
             return;
         }
 
-        performPayment(customerCode, amount);
+        // Check eKYC requirement for high-value transactions
+        if (userId == null) {
+            Toast.makeText(this, "Lỗi: Không tìm thấy người dùng", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        checkEkycAndPay(customerCode, amount);
+    }
+    
+    private void checkEkycAndPay(String customerCode, double amount) {
+        transactionService.checkEkycRequirement(userId, amount, 
+            (ekycRequired, status, message) -> {
+                if (ekycRequired) {
+                    // eKYC is required - show message and navigate to eKYC
+                    if (message != null) {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    }
+                    Intent intent = new Intent(this, EKYCActivity.class);
+                    intent.putExtra("pending_bill_payment_amount", amount);
+                    intent.putExtra("pending_bill_payment_customer_code", customerCode);
+                    intent.putExtra("pending_bill_payment_bill_id", billId);
+                    intent.putExtra("pending_bill_payment_account_id", selectedAccount.getAccountId());
+                    intent.putExtra("pending_bill_payment_type", selectedBillType.equals("Tiền điện") ? "electricity" : "water");
+                    intent.putExtra("pending_bill_payment_provider", selectedBillType.equals("Tiền điện") ? "EVN" : "SAVACO");
+                    startActivityForResult(intent, 1001); // Request code for bill payment
+                } else {
+                    // eKYC not required or already verified - proceed with payment
+                    performPayment(customerCode, amount);
+                }
+            });
+    }
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == 1001 && resultCode == RESULT_OK) {
+            // eKYC verified - proceed with payment
+            if (data != null && data.getBooleanExtra("ekyc_verified", false)) {
+                String customerCode = data.getStringExtra("customer_code");
+                double amount = data.getDoubleExtra("amount", 0);
+                String accountId = data.getStringExtra("account_id");
+                
+                // Ensure we have the selected account
+                if (selectedAccount == null && accountId != null) {
+                    // Load account info
+                    accountRepository.getAccountById(accountId)
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    selectedAccount = documentSnapshot.toObject(Account.class);
+                                    if (selectedAccount != null) {
+                                        selectedAccount.setAccountId(documentSnapshot.getId());
+                                        if (customerCode != null && amount > 0) {
+                                            performPayment(customerCode, amount);
+                                        }
+                                    }
+                                }
+                            });
+                } else if (customerCode != null && amount > 0 && selectedAccount != null) {
+                    performPayment(customerCode, amount);
+                }
+            }
+        }
     }
 
     private void performPayment(String customerCode, double amount) {
@@ -300,6 +407,11 @@ public class BillPaymentActivity extends AppCompatActivity {
         String transactionId = db.collection("transactions").document().getId();
         transaction.setTransactionId(transactionId);
         batch.set(db.collection("transactions").document(transactionId), transaction);
+
+        // Mark bill as paid if billId exists
+        if (billId != null && !billId.isEmpty()) {
+            billRepository.markBillAsPaid(billId);
+        }
 
         // Commit batch
         batch.commit()

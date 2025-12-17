@@ -15,6 +15,9 @@ import com.example.cklbanking.R;
 import com.example.cklbanking.models.Account;
 import com.example.cklbanking.services.OTPService;
 import com.example.cklbanking.services.TransactionService;
+import com.example.cklbanking.utils.AnimationHelper;
+import com.example.cklbanking.utils.ValidationHelper;
+import com.example.cklbanking.utils.TransactionFeeCalculator;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -43,9 +46,11 @@ public class TransferMoneyActivity extends AppCompatActivity {
     private AutoCompleteTextView bankNameDropdown;
     private TextInputEditText editRecipientAccount, editAmount, editMessage;
     private TextView recipientName;
+    private TextView transactionFee;
     private MaterialButton btnAmount100k, btnAmount500k, btnAmount1M;
     private MaterialButton btnTransfer;
     private CircularProgressIndicator progressBar;
+    private com.google.android.material.card.MaterialCardView ekycInfoCard;
 
     // Firebase
     private FirebaseAuth mAuth;
@@ -63,7 +68,6 @@ public class TransferMoneyActivity extends AppCompatActivity {
     private List<Account> userAccounts;
     private Account selectedFromAccount;
     private String transferType = "internal";
-    private static final double HIGH_VALUE_THRESHOLD = 5000000; // 5 million VND
     private String[] vietnameseBanks = {
         "Vietcombank", "Techcombank", "BIDV", "VietinBank", "ACB",
         "MB Bank", "Sacombank", "VPBank", "Agribank", "TPBank"
@@ -92,6 +96,9 @@ public class TransferMoneyActivity extends AppCompatActivity {
 
         // Setup Listeners
         setupListeners();
+        
+        // Setup amount change listener to show/hide eKYC info
+        setupAmountListener();
 
         // Load user accounts
         loadUserAccounts();
@@ -123,6 +130,8 @@ public class TransferMoneyActivity extends AppCompatActivity {
         btnAmount1M = findViewById(R.id.btnAmount1M);
         btnTransfer = findViewById(R.id.btnTransfer);
         progressBar = findViewById(R.id.progressBar);
+        ekycInfoCard = findViewById(R.id.ekycInfoCard);
+        transactionFee = findViewById(R.id.transactionFee);
     }
 
     private void setupToolbar() {
@@ -144,6 +153,8 @@ public class TransferMoneyActivity extends AppCompatActivity {
                 transferType = "external";
                 layoutBankName.setVisibility(View.VISIBLE);
             }
+            // Update fee display when transfer type changes
+            updateTransactionFee();
         });
 
         fromAccountLayout.setOnClickListener(v -> selectFromAccount());
@@ -153,6 +164,72 @@ public class TransferMoneyActivity extends AppCompatActivity {
         btnAmount1M.setOnClickListener(v -> setAmount(1000000));
 
         btnTransfer.setOnClickListener(v -> processTransfer());
+    }
+    
+    private void setupAmountListener() {
+        editAmount.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                // Check if amount requires eKYC
+                String amountStr = s.toString().trim();
+                if (!amountStr.isEmpty()) {
+                    try {
+                        double amount = Double.parseDouble(amountStr);
+                        if (amount >= 10000000) { // 10 million VND
+                            // Check eKYC status
+                            if (ekycStatus == null || !"verified".equals(ekycStatus)) {
+                                ekycInfoCard.setVisibility(View.VISIBLE);
+                            } else {
+                                ekycInfoCard.setVisibility(View.GONE);
+                            }
+                        } else {
+                            ekycInfoCard.setVisibility(View.GONE);
+                        }
+                        
+                        // Update transaction fee
+                        updateTransactionFee();
+                    } catch (NumberFormatException e) {
+                        ekycInfoCard.setVisibility(View.GONE);
+                        transactionFee.setText("Miễn phí");
+                    }
+                } else {
+                    ekycInfoCard.setVisibility(View.GONE);
+                    transactionFee.setText("Miễn phí");
+                }
+            }
+        });
+    }
+    
+    /**
+     * Update transaction fee display based on current amount and transfer type
+     */
+    private void updateTransactionFee() {
+        String amountStr = editAmount.getText().toString().trim();
+        if (amountStr.isEmpty()) {
+            transactionFee.setText("Miễn phí");
+            return;
+        }
+        
+        try {
+            double amount = Double.parseDouble(amountStr);
+            double fee = TransactionFeeCalculator.calculateFee(amount, transferType);
+            transactionFee.setText(TransactionFeeCalculator.formatFee(fee));
+            
+            // Change color based on fee
+            if (fee == 0) {
+                transactionFee.setTextColor(getColor(R.color.success));
+            } else {
+                transactionFee.setTextColor(getColor(R.color.text_primary));
+            }
+        } catch (NumberFormatException e) {
+            transactionFee.setText("Miễn phí");
+        }
     }
 
     private void selectFromAccount() {
@@ -245,16 +322,31 @@ public class TransferMoneyActivity extends AppCompatActivity {
             return;
         }
 
+        // Validate account number
         String toAccount = editRecipientAccount.getText().toString().trim();
-        if (toAccount.isEmpty()) {
-            editRecipientAccount.setError("Vui lòng nhập số tài khoản người nhận");
+        ValidationHelper.ValidationResult accountValidation = ValidationHelper.validateAccountNumber(toAccount);
+        if (!accountValidation.isValid()) {
+            layoutRecipientAccount.setError(accountValidation.getErrorMessage());
             editRecipientAccount.requestFocus();
             return;
+        } else {
+            layoutRecipientAccount.setError(null);
         }
 
+        // Validate recipient name (required for external transfer)
         String recipient = recipientName.getText().toString().trim();
-        if (recipient.isEmpty()) {
-            recipient = "Không xác định";
+        if (transferType.equals("external")) {
+            ValidationHelper.ValidationResult nameValidation = ValidationHelper.validateRecipientName(recipient);
+            if (!nameValidation.isValid()) {
+                // Show error in a Toast since recipientName is a TextView, not an EditText
+                Toast.makeText(this, nameValidation.getErrorMessage(), Toast.LENGTH_LONG).show();
+                return;
+            }
+        } else {
+            // For internal transfer, recipient name is optional (will be fetched from account)
+            if (recipient.isEmpty()) {
+                recipient = "Không xác định";
+            }
         }
 
         String amountStr = editAmount.getText().toString().trim();
@@ -277,33 +369,51 @@ public class TransferMoneyActivity extends AppCompatActivity {
             return;
         }
 
+        // Validate bank selection for external transfer
         if (transferType.equals("external")) {
             String bank = bankNameDropdown.getText().toString().trim();
-            if (bank.isEmpty()) {
-                bankNameDropdown.setError("Vui lòng chọn ngân hàng");
+            ValidationHelper.ValidationResult bankValidation = ValidationHelper.validateBankName(bank);
+            if (!bankValidation.isValid()) {
+                layoutBankName.setError(bankValidation.getErrorMessage());
                 bankNameDropdown.requestFocus();
                 return;
+            } else {
+                layoutBankName.setError(null);
+            }
+            
+            // Validate bank code
+            String bankCode = ValidationHelper.getBankCodeFromName(bank);
+            if (bankCode == null) {
+                // Bank code not found in mapping - this is OK, but log a warning
+                android.util.Log.w("TransferMoney", "Bank code not found for: " + bank);
             }
         }
-
-        // Check eKYC status for high-value transactions
-        if (amount >= HIGH_VALUE_THRESHOLD) {
-            if (ekycStatus == null || !"verified".equals(ekycStatus)) {
-                Toast.makeText(this, 
-                    "Giao dịch giá trị cao yêu cầu xác thực eKYC. Vui lòng hoàn thành eKYC trước.", 
-                    Toast.LENGTH_LONG).show();
-                Intent intent = new Intent(this, EKYCActivity.class);
-                startActivity(intent);
-                return;
-            }
+        
+        // Calculate transaction fee and check if user has enough balance
+        double fee = TransactionFeeCalculator.calculateFee(amount, transferType);
+        double totalAmount = amount + fee;
+        
+        if (totalAmount > selectedFromAccount.getBalance()) {
+            String errorMsg = String.format(
+                "Số dư không đủ. Số dư hiện tại: %s. Số tiền chuyển: %s. Phí giao dịch: %s. Tổng cần: %s",
+                formatCurrency(selectedFromAccount.getBalance()),
+                formatCurrency(amount),
+                TransactionFeeCalculator.formatFee(fee),
+                formatCurrency(totalAmount)
+            );
+            editAmount.setError(errorMsg);
+            editAmount.requestFocus();
+            return;
         }
 
         // Create final variables for use in lambda
         final String finalToAccount = toAccount;
         final String finalRecipient = recipient;
         final double finalAmount = amount;
+        final double finalFee = fee;
+        final double finalTotalAmount = totalAmount;
 
-        // Verify transaction before creating
+        // Verify transaction before creating (includes eKYC check)
         showLoading(true);
         transactionService.verifyTransaction(
             selectedFromAccount.getAccountNumber(),
@@ -319,13 +429,29 @@ public class TransferMoneyActivity extends AppCompatActivity {
                         showLoading(false);
                         
                         if (!isValid) {
-                            Toast.makeText(TransferMoneyActivity.this, message, 
-                                Toast.LENGTH_LONG).show();
+                            // Check if eKYC is required
+                            if (verificationData != null && 
+                                Boolean.TRUE.equals(verificationData.get("ekycRequired"))) {
+                                // eKYC is required - navigate to eKYC screen
+                                Toast.makeText(TransferMoneyActivity.this, message, 
+                                    Toast.LENGTH_LONG).show();
+                                Intent intent = new Intent(TransferMoneyActivity.this, EKYCActivity.class);
+                                // Pass transaction data to resume after eKYC
+                                intent.putExtra("pending_transaction_amount", finalAmount);
+                                intent.putExtra("pending_transaction_to_account", finalToAccount);
+                                intent.putExtra("pending_transaction_recipient", finalRecipient);
+                                startActivity(intent);
+                                AnimationHelper.applyActivityTransition(TransferMoneyActivity.this);
+                            } else {
+                                // Other validation error
+                                Toast.makeText(TransferMoneyActivity.this, message, 
+                                    Toast.LENGTH_LONG).show();
+                            }
                             return;
                         }
                         
-                        // Transaction is valid, proceed to create transaction
-                        createTransaction(finalToAccount, finalRecipient, finalAmount, verificationData);
+                        // Transaction is valid, proceed to create transaction (with fee)
+                        createTransaction(finalToAccount, finalRecipient, finalAmount, finalFee, finalTotalAmount, verificationData);
                     });
                 }
             }
@@ -333,7 +459,7 @@ public class TransferMoneyActivity extends AppCompatActivity {
     }
 
     private void createTransaction(String toAccount, String recipientName, double amount,
-                                   Map<String, Object> verificationData) {
+                                   double fee, double totalAmount, Map<String, Object> verificationData) {
         showLoading(true);
 
         // Create transaction document with status "pending" - will be updated after OTP and payment
@@ -342,6 +468,8 @@ public class TransferMoneyActivity extends AppCompatActivity {
         transaction.put("toAccountId", toAccount);
         transaction.put("type", "transfer");
         transaction.put("amount", amount);
+        transaction.put("fee", fee);
+        transaction.put("totalAmount", totalAmount); // amount + fee
         transaction.put("status", "pending"); // Will be updated to "completed" after OTP and payment
         transaction.put("timestamp", com.google.firebase.Timestamp.now());
         transaction.put("userId", userId); // Store userId for daily limit checking
@@ -363,20 +491,45 @@ public class TransferMoneyActivity extends AppCompatActivity {
                 .addOnSuccessListener(documentReference -> {
                     String transactionId = documentReference.getId();
                     
-                    // Generate OTP for 2FA and send via email
-                    if (userEmail != null && !userEmail.isEmpty()) {
-                        otpService.generateOTP(transactionId, userId, userEmail);
-                    } else {
+                    // Generate OTP for 2FA and send via email (with rate limiting)
+                    String finalEmail = userEmail;
+                    if (finalEmail == null || finalEmail.isEmpty()) {
                         // Fallback: try to get email from Firebase Auth
-                        String email = mAuth.getCurrentUser() != null ? 
+                        finalEmail = mAuth.getCurrentUser() != null ? 
                             mAuth.getCurrentUser().getEmail() : null;
-                        if (email != null) {
-                            otpService.generateOTP(transactionId, userId, email);
-                        } else {
-                            Toast.makeText(this, 
-                                "Không tìm thấy email. Vui lòng cập nhật email trong hồ sơ.", 
-                                Toast.LENGTH_LONG).show();
-                        }
+                    }
+                    
+                    if (finalEmail != null && !finalEmail.isEmpty()) {
+                        otpService.generateOTP(transactionId, userId, finalEmail, 
+                            new OTPService.OTPGenerationCallback() {
+                                @Override
+                                public void onOTPGenerated(String otpCode, boolean success, String message) {
+                                    runOnUiThread(() -> {
+                                        if (!success) {
+                                            Toast.makeText(TransferMoneyActivity.this, 
+                                                "Lỗi gửi OTP: " + message, Toast.LENGTH_LONG).show();
+                                            showLoading(false);
+                                            return;
+                                        }
+                                        
+                                        // OTP generated successfully, navigate to OTP verification
+                                        Intent intent = new Intent(TransferMoneyActivity.this, 
+                                            OTPVerificationActivity.class);
+                                        intent.putExtra("transaction_id", transactionId);
+                                        intent.putExtra("amount", amount);
+                                        intent.putExtra("recipient", recipientName);
+                                        intent.putExtra("transfer_type", transferType);
+                                        startActivity(intent);
+                                        AnimationHelper.applyActivityTransition(TransferMoneyActivity.this);
+                                        finish();
+                                    });
+                                }
+                            });
+                    } else {
+                        Toast.makeText(this, 
+                            "Không tìm thấy email. Vui lòng cập nhật email trong hồ sơ.", 
+                            Toast.LENGTH_LONG).show();
+                        showLoading(false);
                     }
                     
                     showLoading(false);
@@ -403,7 +556,11 @@ public class TransferMoneyActivity extends AppCompatActivity {
     }
 
     private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            AnimationHelper.showLoadingWithAnimation(progressBar);
+        } else {
+            AnimationHelper.hideLoadingWithAnimation(progressBar);
+        }
         btnTransfer.setEnabled(!show);
     }
 }

@@ -74,6 +74,9 @@ dependencies {
     
     // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 }
 
 apply { plugin("com.google.gms.google-services") }

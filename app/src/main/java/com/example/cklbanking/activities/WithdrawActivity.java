@@ -1,5 +1,6 @@
 package com.example.cklbanking.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -17,6 +18,8 @@ import com.example.cklbanking.models.Account;
 import com.example.cklbanking.models.Transaction;
 import com.example.cklbanking.repositories.AccountRepository;
 import com.example.cklbanking.repositories.TransactionRepository;
+import com.example.cklbanking.services.TransactionService;
+import com.example.cklbanking.utils.ErrorHandler;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
@@ -45,10 +48,13 @@ public class WithdrawActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private AccountRepository accountRepository;
     private TransactionRepository transactionRepository;
+    private TransactionService transactionService;
     private List<Account> accounts;
     private String selectedAccountId;
     private Account selectedAccount;
     private double availableBalance = 0;
+    private String userId;
+    private String ekycStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,10 +65,15 @@ public class WithdrawActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         accountRepository = new AccountRepository();
         transactionRepository = new TransactionRepository();
+        transactionService = new TransactionService();
+        userId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
 
         initViews();
         setupToolbar();
         setupListeners();
+        
+        // Load user info (eKYC status)
+        loadUserInfo();
         
         // Kiểm tra xem có account_id từ intent không
         String accountIdFromIntent = getIntent().getStringExtra("account_id");
@@ -160,8 +171,7 @@ public class WithdrawActivity extends AppCompatActivity {
                     }
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Lỗi tải danh sách tài khoản: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                    ErrorHandler.handleError(this, e, "Lỗi tải danh sách tài khoản");
                 });
         
         spinnerAccount.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -229,14 +239,48 @@ public class WithdrawActivity extends AppCompatActivity {
                             selectedAccount = documentSnapshot.toObject(Account.class);
                             if (selectedAccount != null) {
                                 selectedAccount.setAccountId(documentSnapshot.getId());
-                                performWithdraw(amount);
+                                checkEkycAndWithdraw(amount);
                             }
                         }
+                    })
+                    .addOnFailureListener(e -> {
+                        ErrorHandler.handleError(this, e, "Lỗi tải thông tin tài khoản");
                     });
             return;
         }
         
-        performWithdraw(amount);
+        checkEkycAndWithdraw(amount);
+    }
+    
+    private void loadUserInfo() {
+        if (userId == null) return;
+        
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        ekycStatus = documentSnapshot.getString("ekycStatus");
+                    }
+                });
+    }
+    
+    private void checkEkycAndWithdraw(double amount) {
+        // Check eKYC for high-value withdrawals
+        transactionService.checkEkycRequirement(userId, amount, 
+            (ekycRequired, status, message) -> {
+                if (ekycRequired) {
+                    // eKYC is required - show message and navigate to eKYC
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    Intent intent = new Intent(this, EKYCActivity.class);
+                    intent.putExtra("pending_withdraw_amount", amount);
+                    intent.putExtra("pending_withdraw_account_id", selectedAccountId);
+                    startActivity(intent);
+                } else {
+                    // eKYC not required or already verified - proceed with withdraw
+                    performWithdraw(amount);
+                }
+            });
     }
     
     private void performWithdraw(double amount) {
@@ -280,7 +324,8 @@ public class WithdrawActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> {
                     progressBar.setVisibility(View.GONE);
                     btnWithdraw.setEnabled(true);
-                    Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    ErrorHandler.handleErrorWithRetry(this, e, "Lỗi rút tiền", 
+                        () -> performWithdraw(amount));
                 });
     }
 

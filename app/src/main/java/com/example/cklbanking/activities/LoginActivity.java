@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.cklbanking.R;
+import com.example.cklbanking.utils.AnimationHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.firebase.auth.FirebaseAuth;
@@ -63,10 +64,14 @@ public class LoginActivity extends AppCompatActivity {
     private void setupListeners() {
         btnLogin.setOnClickListener(v -> loginUser());
         btnRegister.setOnClickListener(v -> {
-            startActivity(new Intent(this, RegisterActivity.class));
+            Intent intent = new Intent(this, RegisterActivity.class);
+            startActivity(intent);
+            AnimationHelper.applyActivityTransition(this);
         });
         btnForgotPassword.setOnClickListener(v -> {
-            startActivity(new Intent(this, ForgotPasswordActivity.class));
+            Intent intent = new Intent(this, ForgotPasswordActivity.class);
+            startActivity(intent);
+            AnimationHelper.applyActivityTransition(this);
         });
     }
 
@@ -127,6 +132,7 @@ public class LoginActivity extends AppCompatActivity {
                             Intent intent = new Intent(LoginActivity.this, CustomerDashboardActivity.class);
                             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                             startActivity(intent);
+                            AnimationHelper.applyActivityTransition(this);
                             finish();
                         } else if ("staff".equals(role) || "officer".equals(role)) {
                             // Navigate to Officer Dashboard
@@ -134,6 +140,7 @@ public class LoginActivity extends AppCompatActivity {
                             Intent intent = new Intent(LoginActivity.this, OfficerDashboardActivity.class);
                             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                             startActivity(intent);
+                            AnimationHelper.applyActivityTransition(this);
                             finish();
                         } else {
                             // Unknown role

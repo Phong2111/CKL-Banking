@@ -233,39 +233,64 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:gravity="center"
             android:layout_marginBottom="32dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Mã hết hạn sau: "
-                style="@style/TextCaption"/>
+                android:orientation="horizontal"
+                android:gravity="center">
 
-            <TextView
-                android:id="@+id/otpTimer"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="02:00"
-                android:textColor="@color/error"
-                android:textSize="14sp"
-                android:textStyle="bold"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Mã hết hạn sau: "
+                    style="@style/TextCaption"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" | "
-                style="@style/TextCaption"/>
+                <TextView
+                    android:id="@+id/otpTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="02:00"
+                    android:textColor="@color/error"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"/>
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" | "
+                    style="@style/TextCaption"/>
+
+                <TextView
+                    android:id="@+id/btnResendOtp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gửi lại"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"/>
+            </LinearLayout>
+
+            <!-- Rate limit info -->
             <TextView
-                android:id="@+id/btnResendOtp"
+                android:id="@+id/rateLimitInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Gửi lại"
-                android:textColor="@color/primary"
-                android:textSize="14sp"
-                android:textStyle="bold"/>
+                android:text="Bạn có thể gửi lại mã OTP tối đa 5 lần trong 1 giờ"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:visibility="gone"/>
         </LinearLayout>
 
         <!-- Verify Button -->

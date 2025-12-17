@@ -151,6 +151,9 @@ public class OTPVerificationActivity extends AppCompatActivity {
     }
 
     private void startTimer() {
+        // Load actual expiry time from Firestore
+        loadOTPExpiryTime();
+        
         countDownTimer = new CountDownTimer(timeLeftInMillis, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
@@ -161,12 +164,54 @@ public class OTPVerificationActivity extends AppCompatActivity {
             @Override
             public void onFinish() {
                 otpTimer.setText("00:00");
+                otpTimer.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
                 btnVerifyOtp.setEnabled(false);
                 btnResendOtp.setEnabled(true);
                 Toast.makeText(OTPVerificationActivity.this, 
-                    "Mã OTP đã hết hạn", Toast.LENGTH_SHORT).show();
+                    "Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.", Toast.LENGTH_SHORT).show();
             }
         }.start();
+    }
+    
+    /**
+     * Load actual OTP expiry time from Firestore to sync countdown timer
+     */
+    private void loadOTPExpiryTime() {
+        if (transactionId == null) return;
+        
+        db.collection("otps")
+                .document(transactionId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        Long expiresAt = documentSnapshot.getLong("expiresAt");
+                        if (expiresAt != null) {
+                            long currentTime = System.currentTimeMillis();
+                            long remainingTime = expiresAt - currentTime;
+                            
+                            if (remainingTime > 0) {
+                                timeLeftInMillis = remainingTime;
+                                // Restart timer with correct time
+                                if (countDownTimer != null) {
+                                    countDownTimer.cancel();
+                                }
+                                startTimer();
+                            } else {
+                                // OTP already expired
+                                timeLeftInMillis = 0;
+                                updateTimerText();
+                                otpTimer.setText("00:00");
+                                btnVerifyOtp.setEnabled(false);
+                                btnResendOtp.setEnabled(true);
+                            }
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("OTPVerification", "Error loading OTP expiry", e);
+                    // Use default 2 minutes if can't load
+                    timeLeftInMillis = 120000;
+                });
     }
 
     private void updateTimerText() {
@@ -174,6 +219,29 @@ public class OTPVerificationActivity extends AppCompatActivity {
         int seconds = (int) (timeLeftInMillis / 1000) % 60;
         String timeFormatted = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
         otpTimer.setText(timeFormatted);
+        
+        // Change color based on remaining time
+        if (timeLeftInMillis < 30000) { // Less than 30 seconds
+            otpTimer.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+        } else if (timeLeftInMillis < 60000) { // Less than 1 minute
+            otpTimer.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+        } else {
+            otpTimer.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+        }
+    }
+    
+    /**
+     * Disable OTP input when account is locked
+     */
+    private void disableOTPInput() {
+        otp1.setEnabled(false);
+        otp2.setEnabled(false);
+        otp3.setEnabled(false);
+        otp4.setEnabled(false);
+        otp5.setEnabled(false);
+        otp6.setEnabled(false);
+        btnVerifyOtp.setEnabled(false);
+        btnResendOtp.setEnabled(false);
     }
 
     private void loadUserEmail() {
@@ -325,20 +393,28 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         showLoading(true);
 
-        // Verify OTP using OTPService
-        otpService.verifyOTP(transactionId, otpCode, new OTPService.OTPVerificationCallback() {
+        // Verify OTP using OTPService (with account lock check)
+        otpService.verifyOTP(transactionId, otpCode, userId, new OTPService.OTPVerificationCallback() {
             @Override
-            public void onVerificationResult(boolean success, String message) {
+            public void onVerificationResult(boolean success, String message, boolean isLocked) {
                 runOnUiThread(() -> {
-            showLoading(false);
-            
+                    showLoading(false);
+                    
                     if (success) {
                         // OTP verified, now process payment and persist transaction
                         processTransactionAfterOTP();
-            } else {
-                        Toast.makeText(OTPVerificationActivity.this, message, 
-                            Toast.LENGTH_SHORT).show();
-            }
+                    } else {
+                        // Show error message
+                        if (isLocked) {
+                            // Account is locked - disable OTP input
+                            disableOTPInput();
+                            Toast.makeText(OTPVerificationActivity.this, message, 
+                                Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(OTPVerificationActivity.this, message, 
+                                Toast.LENGTH_SHORT).show();
+                        }
+                    }
                 });
             }
         });
@@ -440,22 +516,37 @@ public class OTPVerificationActivity extends AppCompatActivity {
         showLoading(true);
         btnResendOtp.setEnabled(false);
 
-        // Resend OTP using OTPService (via email)
-        String newOTP = otpService.resendOTP(transactionId, userId, userEmail);
-        
-        // Reset timer
-        timeLeftInMillis = 120000;
-        if (countDownTimer != null) {
-            countDownTimer.cancel();
-        }
-        startTimer();
-        
-        btnResendOtp.setEnabled(false);
-        btnVerifyOtp.setEnabled(true);
-        clearOTP();
-        
-        showLoading(false);
-        Toast.makeText(this, "Đã gửi lại mã OTP", Toast.LENGTH_SHORT).show();
+        // Resend OTP using OTPService (with rate limiting)
+        otpService.resendOTP(transactionId, userId, userEmail, 
+            new OTPService.OTPGenerationCallback() {
+                @Override
+                public void onOTPGenerated(String otpCode, boolean success, String message) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        
+                        if (success) {
+                            // Reset timer
+                            timeLeftInMillis = 120000;
+                            if (countDownTimer != null) {
+                                countDownTimer.cancel();
+                            }
+                            startTimer();
+                            
+                            btnResendOtp.setEnabled(false);
+                            btnVerifyOtp.setEnabled(true);
+                            clearOTP();
+                            
+                            Toast.makeText(OTPVerificationActivity.this, 
+                                "Đã gửi lại mã OTP", Toast.LENGTH_SHORT).show();
+                        } else {
+                            // Rate limit exceeded or other error
+                            Toast.makeText(OTPVerificationActivity.this, 
+                                "Lỗi: " + message, Toast.LENGTH_LONG).show();
+                            btnResendOtp.setEnabled(true);
+                        }
+                    });
+                }
+            });
     }
 
     private String getOTPCode() {

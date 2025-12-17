@@ -2,12 +2,16 @@
 <network-security-config>
     <!-- Cho phép cleartext traffic cho Firebase Emulator -->
     <!-- Android Emulator sử dụng 10.0.2.2 để kết nối với localhost của máy host -->
+    <!-- Physical device cần dùng IP thật của máy tính (ví dụ: 192.168.1.100) -->
     <domain-config cleartextTrafficPermitted="true">
         <!-- Android Emulator localhost -->
         <domain includeSubdomains="false">10.0.2.2</domain>
         <!-- Localhost (cho physical device nếu cần) -->
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- Cho phép tất cả IP local (192.168.x.x, 10.x.x.x) cho physical device -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">10.0.0.0</domain>
     </domain-config>
     
     <!-- Production: Chỉ cho phép HTTPS -->

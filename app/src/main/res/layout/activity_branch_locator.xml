@@ -186,13 +186,108 @@
                     android:text="Chỉ đường"/>
             </LinearLayout>
 
+            <!-- Filter Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bộ lọc"
+                style="@style/TextTitle"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- Distance Filter -->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupDistance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="true"
+                app:selectionRequired="false"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipDistanceAll"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tất cả"
+                    android:checked="true"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipDistance1km"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="≤ 1 km"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipDistance5km"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="≤ 5 km"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipDistance10km"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="≤ 10 km"/>
+            </com.google.android.material.chip.ChipGroup>
+
+            <!-- Type and Status Filter -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupType"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:singleSelection="true"
+                    app:selectionRequired="false"
+                    android:layout_marginEnd="8dp">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipTypeAll"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tất cả"
+                        android:checked="true"/>
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipTypeBranch"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Chi nhánh"/>
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipTypeATM"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ATM"/>
+                </com.google.android.material.chip.ChipGroup>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipOnlyOpen"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Chỉ mở cửa"
+                    android:checkable="true"/>
+            </LinearLayout>
+
             <!-- All Branches List -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Tất cả chi nhánh"
                 style="@style/TextTitle"
-                android:layout_marginTop="24dp"
                 android:layout_marginBottom="12dp"/>
 
             <androidx.recyclerview.widget.RecyclerView

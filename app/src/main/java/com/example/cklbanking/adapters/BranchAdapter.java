@@ -62,8 +62,8 @@ public class BranchAdapter extends RecyclerView.Adapter<BranchAdapter.BranchView
 
     class BranchViewHolder extends RecyclerView.ViewHolder {
         MaterialCardView cardView;
-        ImageView branchIcon;
-        TextView branchName, branchAddress, branchDistance, branchType;
+        ImageView branchIcon, iconFavorite;
+        TextView branchName, branchAddress, branchDistance, branchType, branchStatus;
 
         public BranchViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -73,6 +73,8 @@ public class BranchAdapter extends RecyclerView.Adapter<BranchAdapter.BranchView
             branchAddress = itemView.findViewById(R.id.branchAddress);
             branchDistance = itemView.findViewById(R.id.branchDistance);
             branchType = itemView.findViewById(R.id.branchType);
+            branchStatus = itemView.findViewById(R.id.branchStatus);
+            iconFavorite = itemView.findViewById(R.id.iconFavorite);
         }
 
         public void bind(Branch branch) {
@@ -90,25 +92,30 @@ public class BranchAdapter extends RecyclerView.Adapter<BranchAdapter.BranchView
                 }
             }
 
-            // Calculate and display distance
+            // Calculate and display distance using BranchDistanceHelper
             if (userLocation != null) {
-                float[] results = new float[1];
-                Location.distanceBetween(
-                        userLocation.getLatitude(), userLocation.getLongitude(),
-                        branch.getLatitude(), branch.getLongitude(),
-                        results
-                );
-                
-                double distanceInMeters = results[0];
-                String distanceText;
-                if (distanceInMeters < 1000) {
-                    distanceText = String.format("%.0f m", distanceInMeters);
-                } else {
-                    distanceText = String.format("%.2f km", distanceInMeters / 1000);
-                }
+                double distanceInMeters = com.example.cklbanking.utils.BranchDistanceHelper.calculateDistance(
+                    userLocation, branch);
+                String distanceText = com.example.cklbanking.utils.BranchDistanceHelper.formatDistance(distanceInMeters);
                 branchDistance.setText(distanceText);
+                branchDistance.setVisibility(View.VISIBLE);
             } else {
                 branchDistance.setText("--");
+                branchDistance.setVisibility(View.VISIBLE);
+            }
+            
+            // Set branch status (open/closed)
+            boolean isOpen = branch.isOpen();
+            branchStatus.setText(isOpen ? "Đang mở" : "Đã đóng");
+            branchStatus.setTextColor(isOpen ? 
+                context.getColor(R.color.success) : 
+                context.getColor(R.color.error));
+            
+            // Show favorite icon if branch is favorite
+            if (branch.isFavorite()) {
+                iconFavorite.setVisibility(View.VISIBLE);
+            } else {
+                iconFavorite.setVisibility(View.GONE);
             }
 
             // Set click listener
@@ -123,6 +130,13 @@ public class BranchAdapter extends RecyclerView.Adapter<BranchAdapter.BranchView
         notifyDataSetChanged();
     }
 }
+
+
+
+
+
+
+
 
 
 
